@@ -1,5 +1,5 @@
 <core:FragmentDefinition xmlns="sap.m" xmlns:core="sap.ui.core" xmlns:layout="sap.ui.layout">
-    <Dialog id="CreateAllocationDialog" title="Allocate Resource to Project" contentWidth="500px">
+    <Dialog id="CreateAllocationDialog" title="Allocate Resource to Project" contentWidth="35rem">
         <content>
             <VBox class="sapUiSmallMargin">
                 <Label text="Select Project" required="true" class="customLabel sapUiTinyMarginBottom"/>
@@ -27,7 +27,7 @@
                     </VBox>
 
                     <VBox items="{/newAllocationSlots}">
-                        <HBox class="slotRowBox sapUiTinyMarginBottom" alignItems="Center" width="100%">
+                        <HBox class="slotRowBox sapUiTinyMarginBottom" alignItems="Center" width="100%" wrap="Wrap">
                             <ComboBox selectedKey="{role}" items="{path: '/availableRoles', templateShareable: true}" visible="{customRole}" class="customInput sapUiTinyMarginEnd" width="8rem" placeholder="Role...">
                                 <!-- Bind to the current simple role value (same pattern as other fragments) -->
                                 <core:Item key="{}" text="{}" />

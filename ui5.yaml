@@ -17,7 +17,7 @@ server:
           url: https://ui5.sap.com
         backend:
           - path: /browse
-            url: https://org-build-stefbuildjs-build-project-management-capm-srv.cfapps.us10-001.hana.ondemand.com
+            url: https://d283a1e6trial-dev-project-management-capm-srv.cfapps.us10-001.hana.ondemand.com/
     - name: fiori-tools-appreload
       afterMiddleware: compression
       configuration:

@@ -56,14 +56,20 @@
                             <HBox class="filterBox" alignItems="End" wrap="Wrap">
                                 <VBox class="sapUiSmallMarginEnd">
                                     <Label text="Filter by Project" class="filterLabel"/>
-                                    <Select items="{/projects}" selectedKey="{/filters/projectId}" change="onFilterChange" width="200px" forceSelection="false">
+                                    <Select items="{/projects}" selectedKey="{/filters/projectId}" change="onFilterChange" width="100%" forceSelection="false">
                                         <core:Item key="{id}" text="{name}" />
+                                        <layoutData>
+                                            <FlexItemData growFactor="1" maxWidth="15rem" />
+                                        </layoutData>
                                     </Select>
                                 </VBox>
                                 <VBox class="sapUiSmallMarginEnd">
                                     <Label text="Filter by Resource" class="filterLabel"/>
-                                    <Select items="{/resources}" selectedKey="{/filters/resourceId}" change="onFilterChange" width="200px" forceSelection="false">
+                                    <Select items="{/resources}" selectedKey="{/filters/resourceId}" change="onFilterChange" width="100%" forceSelection="false">
                                         <core:Item key="{id}" text="{name}" />
+                                        <layoutData>
+                                            <FlexItemData growFactor="1" maxWidth="15rem" />
+                                        </layoutData>
                                     </Select>
                                 </VBox>
                                 <Button text="Clear Filters" press="onClearFilters" type="Transparent" class="clearBtn"/>
@@ -158,10 +164,10 @@
                             <Table items="{/analytics/enrichedResources}" class="customTable">
                                 <columns>
                                     <Column><Text text="Name" class="colText"/></Column>
-                                    <Column><Text text="Type" class="colText"/></Column>
+                                    <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Type" class="colText"/></Column>
                                     <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Roles" class="colText"/></Column>
                                     <Column hAlign="End" demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Cost Profile / Year" class="colText"/></Column>
-                                    <Column hAlign="End"><Text text="Rate" class="colText"/></Column>
+                                    <Column hAlign="End" demandPopin="true" minScreenWidth="Phone" popinDisplay="Inline"><Text text="Rate" class="colText"/></Column>
                                     <Column hAlign="Center" width="4rem"></Column>
                                 </columns>
                                 <items>
@@ -196,14 +202,14 @@
                             </HBox>
                             <Table items="{/analytics/enrichedProjects}" class="customTable">
                                 <columns>
-                                    <Column><Text text="Project ID" class="colText"/></Column>
+                                    <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Project ID" class="colText"/></Column>
                                     <Column><Text text="Project Name" class="colText"/></Column>
                                     <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Timeline" class="colText"/></Column>
                                     <Column demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Req. Roles" class="colText"/></Column>
                                     <Column demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Allocated Resources" class="colText"/></Column>
                                     <!-- <Column demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Template" class="colText"/></Column> -->
                                     <Column hAlign="End" demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Actual Costs" class="colText"/></Column>
-                                    <Column hAlign="End"><Text text="Budget" class="colText"/></Column>
+                                    <Column hAlign="End" demandPopin="true" minScreenWidth="Phone" popinDisplay="Inline"><Text text="Budget" class="colText"/></Column>
                                     <Column hAlign="Center" width="4rem"></Column>
                                 </columns>
                                 <items>
@@ -254,13 +260,15 @@
                         <VBox class="tableWrapper sapUiMediumMarginTop">
                             <VBox class="kpiCard sapUiSmallMarginBottom" style="padding: 1rem;">
                                 <HBox justifyContent="SpaceBetween" alignItems="Center" width="100%" wrap="Wrap">
-                                    <VBox width="50%">
+                                    <VBox width="100%">
                                         <Label text="Select Project for WBS" class="filterLabel" />
-                                        <HBox alignItems="Center">
-                                            <Select selectedKey="{/wbsSelectedProjectId}" items="{path: '/projects'}" forceSelection="false" change="onWbsProjectChange" width="25rem" class="sapUiTinyMarginEnd forceWhiteSelect">
+                                        <HBox alignItems="Center" width="100%">
+                                            <Select selectedKey="{/wbsSelectedProjectId}" items="{path: '/projects'}" forceSelection="false" change="onWbsProjectChange" width="100%" class="sapUiTinyMarginEnd forceWhiteSelect">
                                                 <core:Item key="{id}" text="{name}" />
+                                                <layoutData>
+                                                    <FlexItemData growFactor="1" maxWidth="25rem" />
+                                                </layoutData>
                                             </Select>
-                    
                                         </HBox>
                                     </VBox>
                                 </HBox>
@@ -269,6 +277,9 @@
                                     <HBox justifyContent="SpaceBetween" alignItems="Center" wrap="Wrap" width="100%">
                                         <Title text="Project Plan &amp; Allocations" class="tableTitle sapUiSmallMarginBottom" />
                                         <HBox alignItems="Center" class="sapUiSmallMarginBottom" wrap="Wrap">
+                                            <u:FileUploader id="wbsExcelFileUploader" visible="false" fileType="xlsx,xls,csv" change="onImportExcelFile" />
+                                            <Button text="Import" press="onImportCSV" class="customPrimaryBtn sapUiSmallMarginEnd" />
+                                            <!-- <Button text="Delete All Tasks" press="onDeleteAllWbsTasks" type="Reject" class="sapUiSmallMarginEnd" /> -->
                                             <Button text="+ Add Task" press="onAddWbsTask" class="customPrimaryBtn" />
                                         </HBox>
                                     </HBox>
@@ -279,14 +290,15 @@
                             <VBox visible="{= !!${/wbsSelectedProjectId} &amp;&amp; ${/wbsTasksForSelectedProject}.length > 0 }" class="customPanel" style="overflow-x: auto;">
                                 <Table items="{/wbsTasksForSelectedProject}" class="customTable" mode="None">
                                     <columns>
-                                        <Column width="2rem" hAlign="Center"><Text text="#" class="colText"/></Column>
-                                        <Column width="10rem"><Text text="Phase / Criticality" class="colText"/></Column>
+                                        <Column width="2rem" hAlign="Center" demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="#" class="colText"/></Column>
+                                        <Column width="8rem" demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Phase / Criticality" class="colText"/></Column>
                                         <Column width="10rem"><Text text="Task Name" class="colText"/></Column>
-                                        <Column width="4rem" hAlign="Center"><Text text="Hrs" class="colText"/></Column>
-                                        <Column width="11rem"><Text text="Predecessor" class="colText"/></Column>
-                                        <Column width="9rem"><Text text="Start Date" class="colText"/></Column>
-                                        <Column width="9rem"><Text text="End Date" class="colText"/></Column>
-                                        <Column width="14rem"><Text text="Resource" class="colText"/></Column>
+                                        <Column width="3rem" hAlign="Center" demandPopin="true" minScreenWidth="Phone" popinDisplay="Inline"><Text text="Hrs" class="colText"/></Column>
+                                        <Column width="6rem" demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Predecessor" class="colText"/></Column>
+                                        <Column width="7rem" demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Start Date" class="colText"/></Column>
+                                        <Column width="7rem" demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="End Date" class="colText"/></Column>
+                                        <Column width="11rem" demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Resource" class="colText"/></Column>
+                                        <Column width="11rem" demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Reallocated To" class="colText"/></Column>
                                         <Column width="3rem" hAlign="Center"><Text text="" class="colText"/></Column>
                                     </columns>
                                     <items>
@@ -300,6 +312,9 @@
                                                 <Input value="{startDateEdit}" type="Date" placeholder="YYYY-MM-DD" class="customInput textXsInput" width="100%" editable="false"/>
                                                 <Input value="{endDateEdit}" type="Date" placeholder="YYYY-MM-DD" class="customInput textXsInput" width="100%" editable="false"/>
                                                 <Select selectedKey="{resourceId}" items="{path: '/resources'}" forceSelection="false" width="100%" class="forceWhiteSelect" change="onUpdateWbsTaskResource">
+                                                    <core:Item key="{id}" text="{name}" />
+                                                </Select>
+                                                <Select selectedKey="{reallocatedToId}" items="{path: '/resources'}" forceSelection="false" width="100%" class="forceWhiteSelect" change="onUpdateWbsTaskReallocation">
                                                     <core:Item key="{id}" text="{name}" />
                                                 </Select>
                                                 <Button icon="sap-icon://decline" press="onRemoveWbsTask" type="Transparent" class="deleteIconHover" />
@@ -401,14 +416,14 @@
 
                                     <!-- Resources View -->
                                     <VBox items="{/timelineResourceData}" visible="{= ${/timelineActiveSection} === 'resources' }">
-                                        <HBox class="timelineTaskRow">
+                                        <HBox class="timelineTaskRow resourceTimelineRow">
                                             <VBox class="timelineLabelCol timelineTaskLabelCol">
                                                 <Text text="{resourceName}" class="boldText" style="font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" tooltip="{resourceName}" />
                                                 <Text text="{totalHours}h Total Allocated" class="lightText textXs" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;" />
                                             </VBox>
                                             
                                             <!-- Dynamic Height based on tasks -->
-                                            <HBox class="timelineGridArea timelineBarArea dynamicResourcRow" style="min-width: {/timelineData/gridMinWidth}">
+                                            <HBox class="timelineGridArea timelineBarArea dynamicResourcRow" style="min-width: {/timelineData/gridMinWidth}; height: auto; min-height: 3.5rem;">
                                                 <customData>
                                                     <core:CustomData key="heightPx" value="{heightPx}" writeToDom="true" />
                                                 </customData>
@@ -446,19 +461,22 @@
                         </VBox>
                     </IconTabFilter>
 
-                    <IconTabFilter text="Employees" key="employees" icon="sap-icon://employee">
+                    <IconTabFilter text="My Timesheet" key="employees" icon="sap-icon://employee">
                         <VBox class="tableWrapper sapUiMediumMarginTop">
                             <VBox class="kpiCard sapUiSmallMarginBottom" style="padding: 1rem;">
-                                <VBox width="50%">
+                                <VBox width="100%">
                                     <Label text="Select Resource" class="filterLabel" />
-                                    <Select selectedKey="{/employeeSelectedResourceId}" items="{path: '/resources'}" forceSelection="false" change="onEmployeeResourceChange" width="25rem" class="forceWhiteSelect">
+                                    <Select selectedKey="{/employeeSelectedResourceId}" items="{path: '/resources'}" forceSelection="false" change="onEmployeeResourceChange" width="100%" class="forceWhiteSelect">
                                         <core:Item key="{id}" text="{name}" />
+                                        <layoutData>
+                                            <FlexItemData growFactor="1" maxWidth="25rem" />
+                                        </layoutData>
                                     </Select>
                                 </VBox>
                             </VBox>
 
-                            <!-- KPI Summary Cards (above tasks table) -->
-                            <VBox visible="{= !!${/employeeSelectedResourceId} &amp;&amp; ${/employeeTasks}.length > 0 &amp;&amp; !!${/employeeTimeSummary} }">
+                            <!-- KPI Summary Cards -->
+                            <VBox visible="{= !!${/employeeSelectedResourceId} &amp;&amp; ${/employeeTasks}.length > 0 &amp;&amp; !${/employeeTasksNotRunning} }">
                                 <HBox wrap="Wrap" justifyContent="SpaceBetween" class="kpiContainer sapUiSmallMarginBottom">
                                     <VBox class="kpiCard borderBlue">
                                         <Text text="Total Planned Hours" class="kpiTitle"/>
@@ -481,25 +499,27 @@
                                 </HBox>
                             </VBox>
 
-                            <!-- Employee Tasks Table -->
+                            <!-- Employee Tasks Table (planning data only) -->
                             <VBox visible="{= !!${/employeeSelectedResourceId} &amp;&amp; ${/employeeTasks}.length > 0 }" class="customPanel" style="overflow-x: auto;">
                                 <Panel backgroundDesign="Solid" class="customPanel">
                                     <headerToolbar>
                                         <Toolbar height="3rem" style="Clear">
                                             <core:Icon src="sap-icon://task" class="sapUiTinyMarginEnd lightText"/>
                                             <Title text="Assigned Tasks" class="tableTitle"/>
+                                            <ToolbarSpacer />
+                                            <Button text="Manual Log Work" icon="sap-icon://add-document" press="onOpenManualLogWork" type="Emphasized" />
                                         </Toolbar>
                                     </headerToolbar>
                                     <Table items="{/employeeTasks}" class="customTable" mode="None">
                                         <columns>
                                             <Column><Text text="Project" class="colText"/></Column>
-                                            <Column><Text text="Phase" class="colText"/></Column>
+                                            <Column demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Phase" class="colText"/></Column>
                                             <Column><Text text="Task" class="colText"/></Column>
-                                            <Column hAlign="Center" width="5rem"><Text text="Planned" class="colText"/></Column>
-                                            <Column hAlign="Center" width="7rem"><Text text="Time Worked" class="colText"/></Column>
-                                            <Column hAlign="Center" width="5rem"><Text text="Progress" class="colText"/></Column>
-                                            <Column hAlign="Center"><Text text="Status" class="colText"/></Column>
-                                            <Column hAlign="Center" width="10rem"><Text text="Actions" class="colText"/></Column>
+                                            <Column demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Reassignment" class="colText"/></Column>
+                                            <Column hAlign="Center" width="5rem" demandPopin="true" minScreenWidth="Phone" popinDisplay="Inline"><Text text="Planned" class="colText"/></Column>
+                                            <Column hAlign="Center" width="7rem" demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Time Worked" class="colText"/></Column>
+                                            <Column hAlign="Center" demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Status" class="colText"/></Column>
+                                            <Column hAlign="Center" width="12rem" demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Actions" class="colText"/></Column>
                                         </columns>
                                         <items>
                                             <ColumnListItem vAlign="Middle" class="hoverableRow">
@@ -508,19 +528,20 @@
                                                         <Text text="{projectName}" class="boldText" />
                                                         <Text text="{path: 'startDate', formatter: '.formatDate'} - {path: 'endDate', formatter: '.formatDate'}" class="textXs lightText" />
                                                     </VBox>
-                                                    <Text text="{phaseName}" class="lightText" />
+                                                    <Text text="{phaseName}" class="lightText textXs" />
                                                     <Text text="{name}" class="boldText" />
+                                                    <Text text="{reallocationStatusText}" visible="{= !!${reallocationStatusText}}" class="textXs customBlueText" />
                                                     <Text text="{hours} hrs" class="boldText" />
                                                     <VBox alignItems="Center">
                                                         <Text text="{elapsedDisplay}" class="{= ${isOvertime} ? 'boldText textRed' : 'boldText customBlueText'}" />
                                                         <Text text="{= ${isOvertime} ? 'Overtime' : ''}" visible="{isOvertime}" class="textXs textRed" />
                                                     </VBox>
-                                                    <Text text="{progressPercent}%" class="{= ${progressPercent} >= 100 ? 'boldText textRed' : 'boldText'}" />
-                                                    <ObjectStatus text="{status}" state="{= ${status} === 'Completed' ? 'Success' : (${status} === 'In Progress' ? 'Warning' : (${status} === 'Paused' ? 'Information' : 'None'))}" inverted="true" class="customStatusPill" />
+                                                    <ObjectStatus text="{status}" state="{= ${status} === 'Completed' ? 'Success' : (${status} === 'Working' ? 'Warning' : (${status} === 'Paused' ? 'Information' : 'None'))}" inverted="true" class="customStatusPill" />
                                                     <HBox justifyContent="Center" alignItems="Center">
-                                                        <Button icon="sap-icon://begin" tooltip="Start" press="onEmployeeTaskStart" type="Accept" enabled="{= ${status} !== 'In Progress' &amp;&amp; ${status} !== 'Completed'}" class="sapUiTinyMarginEnd" />
-                                                        <Button icon="sap-icon://pause" tooltip="Pause" press="onEmployeeTaskPause" type="Attention" enabled="{= ${status} === 'In Progress'}" class="sapUiTinyMarginEnd" />
-                                                        <Button icon="sap-icon://stop" tooltip="Stop / Complete" press="onEmployeeTaskStop" type="Reject" enabled="{= ${status} !== 'Completed' &amp;&amp; ${status} !== 'Not Started'}" />
+                                                        <Button icon="sap-icon://edit" tooltip="Update Progress" press="onEmployeeTaskEditDialog" type="Transparent" class="sapUiTinyMarginEnd" />
+                                                        <Button icon="sap-icon://begin" tooltip="Start" press="onEmployeeTaskStart" type="Accept" enabled="{= !${isReallocatedToSomeoneElse} &amp;&amp; ${status} !== 'Working' &amp;&amp; ${status} !== 'Completed'}" class="sapUiTinyMarginEnd" />
+                                                        <Button icon="sap-icon://pause" tooltip="Pause" press="onEmployeeTaskPause" type="Attention" enabled="{= !${isReallocatedToSomeoneElse} &amp;&amp; ${status} === 'Working'}" class="sapUiTinyMarginEnd" />
+                                                        <Button icon="sap-icon://stop" tooltip="Complete" press="onEmployeeTaskStop" type="Reject" enabled="{= !${isReallocatedToSomeoneElse} &amp;&amp; ${status} !== 'Completed' &amp;&amp; ${status} !== 'Not Started'}" />
                                                     </HBox>
                                                 </cells>
                                             </ColumnListItem>
@@ -529,40 +550,38 @@
                                 </Panel>
                             </VBox>
 
-                            <!-- Task Time Log (per-task breakdown) -->
-                            <VBox visible="{= !!${/employeeSelectedResourceId} &amp;&amp; ${/employeeTasks}.length > 0 }" class="sapUiSmallMarginTop">
+
+
+                            <!-- Non-Billable Work Logs -->
+                            <VBox visible="{= !!${/employeeSelectedResourceId} &amp;&amp; ${/employeeNonBillableLogs}.length > 0 }" class="customPanel sapUiMediumMarginTop" style="overflow-x: auto;">
                                 <Panel backgroundDesign="Solid" class="customPanel">
                                     <headerToolbar>
                                         <Toolbar height="3rem" style="Clear">
                                             <core:Icon src="sap-icon://time-entry-request" class="sapUiTinyMarginEnd lightText"/>
-                                            <Title text="Task Time Log" class="tableTitle"/>
+                                            <Title text="Non-Billable Work Logs" class="tableTitle"/>
+                                            <ToolbarSpacer />
                                         </Toolbar>
                                     </headerToolbar>
-                                    <List items="{/employeeTasks}" class="customTable" showSeparators="Inner">
-                                        <CustomListItem class="hoverableRow">
-                                            <HBox alignItems="Center" justifyContent="SpaceBetween" width="100%" style="padding: 0.75rem 1rem;">
-                                                <VBox width="35%">
-                                                    <Text text="{name}" class="boldText" />
-                                                    <Text text="{projectName} · {phaseName}" class="lightText textXs" />
-                                                </VBox>
-                                                <VBox alignItems="Center" width="15%">
-                                                    <Text text="Planned" class="lightText textXs" />
-                                                    <Text text="{hours} hrs" class="boldText" />
-                                                </VBox>
-                                                <VBox alignItems="Center" width="15%">
-                                                    <Text text="Worked" class="lightText textXs" />
-                                                    <Text text="{elapsedDisplay}" class="{= ${isOvertime} ? 'boldText textRed' : 'boldText customBlueText'}" />
-                                                </VBox>
-                                                <VBox width="25%" class="sapUiTinyMarginBegin">
-                                                    <HBox justifyContent="SpaceBetween" width="100%">
-                                                        <Text text="{progressPercent}%" class="textXs boldText" />
-                                                        <ObjectStatus text="{status}" state="{= ${status} === 'Completed' ? 'Success' : (${status} === 'In Progress' ? 'Warning' : (${status} === 'Paused' ? 'Information' : 'None'))}" inverted="true" class="customStatusPill" />
-                                                    </HBox>
-                                                    <ProgressIndicator percentValue="{progressPercent}" displayValue="{elapsedDisplay} / {hours} hrs" state="{= ${progressPercent} >= 100 ? 'Error' : (${progressPercent} >= 75 ? 'Warning' : 'Success')}" class="sapUiTinyMarginTop" height="1.25rem" />
-                                                </VBox>
-                                            </HBox>
-                                        </CustomListItem>
-                                    </List>
+                                    <Table items="{/employeeNonBillableLogs}" class="customTable" mode="None">
+                                        <columns>
+                                            <Column><Text text="Date" class="colText"/></Column>
+                                            <Column demandPopin="true" minScreenWidth="Phone" popinDisplay="Inline"><Text text="Category" class="colText"/></Column>
+                                            <Column demandPopin="true" minScreenWidth="Phone" popinDisplay="Inline"><Text text="Hours" class="colText"/></Column>
+                                            <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Description" class="colText"/></Column>
+                                            <Column width="3rem" hAlign="Center"><Text text="" class="colText"/></Column>
+                                        </columns>
+                                        <items>
+                                            <ColumnListItem vAlign="Middle" class="hoverableRow nonBillableRow">
+                                                <cells>
+                                                    <Text text="{path: 'date', formatter: '.formatDate'}" class="boldText" />
+                                                    <Text text="{nonBillableType}" class="lightText textXs" />
+                                                    <Text text="{hours} hrs" class="boldText customBlueText" />
+                                                    <Text text="{description}" class="lightText textXs" />
+                                                    <Button icon="sap-icon://delete" type="Transparent" press="onDeleteSingleWorkLog" tooltip="Delete this log" visible="{= !${id}.startsWith('dummy_') }" />
+                                                </cells>
+                                            </ColumnListItem>
+                                        </items>
+                                    </Table>
                                 </Panel>
                             </VBox>
 
@@ -571,6 +590,179 @@
                                 <core:Icon src="sap-icon://task" size="3rem" color="#d1d5db" class="sapUiSmallMarginBottom" />
                                 <Text text="No tasks assigned to this resource." class="boldText" />
                                 <Text text="Assign tasks in the Project WBS tab." class="lightText textXs sapUiTinyMarginTop" />
+                            </VBox>
+
+                        </VBox>
+                    </IconTabFilter>
+
+                    <IconTabFilter text="E-Diary" key="ediary" icon="sap-icon://time-entry-request">
+                        <VBox class="tableWrapper sapUiMediumMarginTop">
+                            <!-- Filters -->
+                            <VBox class="kpiCard sapUiSmallMarginBottom" style="padding: 1rem;">
+                                <HBox justifyContent="SpaceBetween" alignItems="End" wrap="Wrap" width="100%">
+                                    <HBox alignItems="End" wrap="Wrap">
+                                        <VBox class="sapUiSmallMarginEnd">
+                                            <Label text="Filter by Project" class="filterLabel" />
+                                            <Select selectedKey="{/timesheetFilters/projectId}" items="{path: '/projects'}" forceSelection="false" change="onTimesheetFilterChange" width="100%" class="forceWhiteSelect">
+                                                <core:Item key="{id}" text="{name}" />
+                                                <layoutData>
+                                                    <FlexItemData growFactor="1" maxWidth="15rem" />
+                                                </layoutData>
+                                            </Select>
+                                        </VBox>
+                                        <VBox class="sapUiSmallMarginEnd">
+                                            <Label text="Filter by Employee" class="filterLabel" />
+                                            <Select selectedKey="{/timesheetFilters/employeeId}" items="{path: '/resources'}" forceSelection="false" change="onTimesheetFilterChange" width="100%" class="forceWhiteSelect">
+                                                <core:Item key="{id}" text="{name}" />
+                                                <layoutData>
+                                                    <FlexItemData growFactor="1" maxWidth="15rem" />
+                                                </layoutData>
+                                            </Select>
+                                        </VBox>
+                                        <VBox class="sapUiSmallMarginEnd">
+                                            <Label text="Filter by Task Status" class="filterLabel" />
+                                            <Select selectedKey="{/timesheetFilters/status}" forceSelection="false" change="onTimesheetFilterChange" width="100%" class="forceWhiteSelect">
+                                                <core:Item key="Not Started" text="Not Started" />
+                                                <core:Item key="Working" text="Working" />
+                                                <core:Item key="Paused" text="Paused" />
+                                                <core:Item key="Completed" text="Completed" />
+                                                <layoutData>
+                                                    <FlexItemData growFactor="1" maxWidth="15rem" />
+                                                </layoutData>
+                                            </Select>
+                                        </VBox>
+                                        <Button text="Clear" press="onClearTimesheetFilters" type="Transparent" class="clearBtn" />
+                                    </HBox>
+                                </HBox>
+                            </VBox>
+
+                            <!-- KPI Summary -->
+                            <VBox visible="{= ${/timesheetsForDisplay}.length > 0 }">
+                                <HBox wrap="Wrap" justifyContent="SpaceBetween" class="kpiContainer sapUiSmallMarginBottom">
+                                    <VBox class="kpiCard borderBlue">
+                                        <Text text="Entries" class="kpiTitle"/>
+                                        <Title text="{/timesheetSummary/activeEntries} / {/timesheetSummary/totalDisplayedEntries}" class="kpiValue"/>
+                                    </VBox>
+                                    <VBox class="kpiCard borderPurple">
+                                        <Text text="Total Logged Hours" class="kpiTitle"/>
+                                        <Title text="{/timesheetSummary/totalHours} hrs" class="kpiValue"/>
+                                    </VBox>
+                                    <VBox class="kpiCard borderTeal">
+                                        <Text text="Billable Hours" class="kpiTitle"/>
+                                        <Title text="{/timesheetSummary/billableHours} hrs" class="kpiValue"/>
+                                    </VBox>
+                                    <VBox class="kpiCard borderOrange">
+                                        <Text text="Non-Billable Hours" class="kpiTitle"/>
+                                        <Title text="{/timesheetSummary/nonBillableHours} hrs" class="kpiValue"/>
+                                    </VBox>
+                                </HBox>
+                            </VBox>
+
+                            <!-- Timesheet Table -->
+                            <VBox visible="{= ${/timesheetsForDisplay}.length > 0 }" class="customPanel" style="overflow-x: auto;">
+                                <Panel backgroundDesign="Solid" class="customPanel">
+                                    <headerToolbar>
+                                        <Toolbar height="3rem" style="Clear">
+                                            <core:Icon src="sap-icon://request" class="sapUiTinyMarginEnd lightText"/>
+                                            <Title text="Reporting Data" class="tableTitle"/>
+                                            <ToolbarSpacer/>
+                                            <!-- <Button text="Delete All Logs" icon="sap-icon://delete" type="Reject" press="onDeleteAllWorkLogs" class="sapUiSmallMarginEnd" /> -->
+                                            <Text text="Read-only view" class="lightText textXs" />
+                                        </Toolbar>
+                                    </headerToolbar>
+                                    <Table items="{/timesheetsForDisplay}" class="customTable" mode="None">
+                                        <columns>
+                                            <Column width="7rem"><Text text="Date" class="colText"/></Column>
+                                            <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Employee" class="colText"/></Column>
+                                            <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Project" class="colText"/></Column>
+                                            <Column><Text text="Task" class="colText"/></Column>
+                                            <Column demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Reallocation" class="colText"/></Column>
+                                            <Column hAlign="Center" width="8rem" demandPopin="true" minScreenWidth="Phone" popinDisplay="Inline"><Text text="Status" class="colText"/></Column>
+                                            <Column hAlign="Center" width="5rem" demandPopin="true" minScreenWidth="Phone" popinDisplay="Inline"><Text text="Hours" class="colText"/></Column>
+                                            <Column hAlign="Center" width="6rem" demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Billable?" class="colText"/></Column>
+                                            <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="NB Category" class="colText"/></Column>
+                                            <Column demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Description" class="colText"/></Column>
+                                            <Column width="3rem" hAlign="Center"><Text text="" class="colText"/></Column>
+                                        </columns>
+                                        <items>
+                                            <ColumnListItem vAlign="Middle" class="{= ${isBillable} ? 'hoverableRow' : 'hoverableRow nonBillableRow'}">
+                                                <cells>
+                                                    <Text text="{path: 'date', formatter: '.formatDate'}" class="boldText" />
+                                                    <Text text="{employeeName}" class="lightText" />
+                                                    <Text text="{= ${projectName} || 'NA'}" class="boldText" />
+                                                    <Text text="{taskName}" class="lightText" />
+                                                    <Text text="{reallocationStatusText}" class="lightText textXs" visible="{= !!${reallocationStatusText}}" />
+                                                    <ObjectStatus text="{status}" state="{= ${status} === 'Completed' ? 'Success' : (${status} === 'Working' ? 'Warning' : (${status} === 'Paused' ? 'Information' : 'None'))}" inverted="true" class="customStatusPill" />
+                                                    <Text text="{hours}" class="boldText customBlueText" />
+                                                    <!-- Billable Flag -->
+                                                    <core:Icon src="{= ${isBillable} ? 'sap-icon://accept' : 'sap-icon://decline'}" color="{= ${isBillable} ? '#10b981' : '#f59e0b'}" size="1.1rem" />
+                                                    <Text text="{= ${isBillable} ? '—' : ${nonBillableType}}" class="lightText textXs" />
+                                                    <Text text="{description}" class="lightText textXs" />
+                                                    <Button icon="sap-icon://delete" type="Transparent" press="onDeleteSingleWorkLog" tooltip="Delete this log" visible="false" />
+                                                </cells>
+                                            </ColumnListItem>
+                                        </items>
+                                    </Table>
+                                </Panel>
+                            </VBox>
+
+                            <!-- Empty State -->
+                            <VBox visible="{= ${/timesheetsForDisplay}.length === 0 }" class="kpiCard" style="background-color: #f9fafb; padding: 2rem; align-items: center; justify-content: center; min-height: 200px;">
+                                <core:Icon src="sap-icon://time-entry-request" size="3rem" color="#d1d5db" class="sapUiSmallMarginBottom" />
+                                <Text text="No timesheet entries yet." class="boldText" />
+                                <Text text="Click 'Log Work' to record your daily work entries." class="lightText textXs sapUiTinyMarginTop" />
+                            </VBox>
+                        </VBox>
+                    </IconTabFilter>
+
+                    <IconTabFilter text="Tickets Allocation" key="tickets" icon="sap-icon://sys-monitor">
+                        <VBox class="tableWrapper sapUiMediumMarginTop">
+                            <!-- Header Toolbar -->
+                            <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiSmallMarginBottom" wrap="Wrap">
+                                <HBox alignItems="Center">
+                                    <core:Icon src="sap-icon://sys-monitor" size="1.5rem" color="#10b981" class="sapUiTinyMarginEnd" />
+                                    <Title text="Tickets Allocation" class="sectionTitle" />
+                                </HBox>
+                                <HBox alignItems="Center">
+                                    <u:FileUploader id="ticketsExcelFileUploader" visible="false" fileType="xlsx,xls,csv" change="onImportTicketsExcelFile" />
+                                    <Button text="Import" press="onImportTicketsCSV" class="customPrimaryBtn sapUiSmallMarginEnd" />
+                                    <Button text="+ Add Ticket" press="onOpenAddTicketDialog" class="lightBlueBtn" />
+                                </HBox>
+                            </HBox>
+
+                            <!-- Tickets Table -->
+                            <VBox class="customPanel" style="overflow-x: auto;" visible="{= ${/tickets}.length > 0}">
+                                <Table items="{/tickets}" class="customTable" mode="None">
+                                    <columns>
+                                        <Column width="7rem"><Text text="Date" class="colText"/></Column>
+                                        <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Module" class="colText"/></Column>
+                                        <Column><Text text="Ticket No / Ref" class="colText"/></Column>
+                                        <Column demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Description" class="colText"/></Column>
+                                        <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Resource" class="colText"/></Column>
+                                        <Column demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="On Behalf Of" class="colText"/></Column>
+                                        <Column width="3rem" hAlign="Center"><Text text="" class="colText"/></Column>
+                                    </columns>
+                                    <items>
+                                        <ColumnListItem vAlign="Middle" class="hoverableRow">
+                                            <cells>
+                                                <Text text="{path: 'date', formatter: '.formatDate'}" class="boldText" />
+                                                <Text text="{module}" class="lightText" />
+                                                <Text text="{ticketNo}" class="boldText customBlueText" />
+                                                <Text text="{description}" class="lightText textXs" />
+                                                <Text text="{resourceName}" class="lightText" />
+                                                <Text text="{onBehalfOfName}" class="lightText" />
+                                                <Button icon="sap-icon://delete" type="Transparent" press="onDeleteTicket" tooltip="Delete Ticket" class="actionDelete" />
+                                            </cells>
+                                        </ColumnListItem>
+                                    </items>
+                                </Table>
+                            </VBox>
+
+                            <!-- Empty State -->
+                            <VBox visible="{= ${/tickets}.length === 0 }" class="kpiCard" style="background-color: #f9fafb; padding: 2rem; align-items: center; justify-content: center; min-height: 200px;">
+                                <core:Icon src="sap-icon://sys-monitor" size="3rem" color="#d1d5db" class="sapUiSmallMarginBottom" />
+                                <Text text="No tickets allocated yet." class="boldText" />
+                                <Text text="Click '+ Add Ticket' or 'Import' to add tickets." class="lightText textXs sapUiTinyMarginTop" />
                             </VBox>
 
                         </VBox>

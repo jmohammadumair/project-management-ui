@@ -1,0 +1,67 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:f="sap.ui.layout.form"
+    xmlns:layout="sap.ui.layout">
+
+    <Dialog id="ManualLogWorkDialog" title="Manual Work Entry" contentWidth="34rem" class="sapUiContentPadding">
+        <content>
+            <VBox class="sapUiSmallMargin">
+
+                <!-- Dropdowns for Manual Selection -->
+                <VBox width="100%" class="sapUiSmallMarginBottom" visible="{= ${/newManualWorkLog/isBillable}}">
+                    <Label text="Project" class="customLabel" required="true" />
+                    <Select selectedKey="{/newManualWorkLog/projectId}" items="{path: '/manualProjects'}" forceSelection="false" change="onManualProjectChange" width="100%" class="forceWhiteSelect">
+                        <core:Item key="{id}" text="{name}" />
+                    </Select>
+                </VBox>
+
+                <VBox width="100%" class="sapUiSmallMarginBottom" visible="{= !!${/newManualWorkLog/projectId} &amp;&amp; ${/newManualWorkLog/isBillable}}">
+                    <Label text="Task" class="customLabel" required="true" />
+                    <Select selectedKey="{/newManualWorkLog/taskId}" items="{path: '/manualTasks'}" forceSelection="false" width="100%" class="forceWhiteSelect">
+                        <core:Item key="{id}" text="{name} ({phaseName})" />
+                    </Select>
+                </VBox>
+
+                <layout:Grid defaultSpan="L6 M6 S12" class="sapUiSmallMarginTop">
+                    <VBox>
+                        <Label text="Date" class="customLabel" required="true" />
+                        <DatePicker value="{/newManualWorkLog/date}" valueFormat="yyyy-MM-dd" displayFormat="dd/MM/yyyy" width="100%" />
+                    </VBox>
+                    <VBox>
+                        <Label text="Hours Worked" class="customLabel" required="true" />
+                        <Input value="{/newManualWorkLog/hours}" type="Number" placeholder="e.g. 4" width="100%" class="customInput" />
+                    </VBox>
+                </layout:Grid>
+
+                <HBox width="100%" class="sapUiSmallMarginTop" alignItems="Center">
+                    <Label text="Billable Work?" class="customLabel sapUiSmallMarginEnd" />
+                    <Switch state="{/newManualWorkLog/isBillable}" customTextOn="Yes" customTextOff="No" />
+                </HBox>
+
+                <VBox width="100%" class="sapUiSmallMarginTop" visible="{= !${/newManualWorkLog/isBillable}}">
+                    <Label text="Non-Billable Category" class="customLabel" required="{= !${/newManualWorkLog/isBillable}}" />
+                    <Select selectedKey="{/newManualWorkLog/nonBillableType}" width="100%" class="forceWhiteSelect">
+                        <core:Item key="" text="Select Category..." />
+                        <core:Item key="Training Given" text="Training Given" />
+                        <core:Item key="Training Taken" text="Training Taken" />
+                        <core:Item key="Internal Meeting" text="Internal Meeting" />
+                        <core:Item key="Administrative Work" text="Administrative Work" />
+                    </Select>
+                </VBox>
+
+                <Label text="Description of Work" class="customLabel sapUiSmallMarginTop" required="true" />
+                <TextArea value="{/newManualWorkLog/description}" rows="3" width="100%" placeholder="What did you accomplish?" />
+
+            </VBox>
+        </content>
+        <footer>
+            <Toolbar>
+                <ToolbarSpacer />
+                <Button text="Save Entry" press="onSaveManualWorkLog" class="customPrimaryBtn" />
+                <Button text="Cancel" press="onCloseManualWorkLogDialog" class="customCancelBtn" />
+            </Toolbar>
+        </footer>
+    </Dialog>
+
+</core:FragmentDefinition>

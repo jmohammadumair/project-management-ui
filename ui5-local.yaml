@@ -31,7 +31,7 @@ server:
         ignoreCertErrors: true # Ignore TLS certificate errors for local dev
         backend:
           - path: /browse
-            url: https://org-build-stefbuildjs-build-project-management-capm-srv.cfapps.us10-001.hana.ondemand.com
+            url: https://d283a1e6trial-dev-project-management-capm-srv.cfapps.us10-001.hana.ondemand.com
     - name: sap-fe-mockserver
       beforeMiddleware: csp
       configuration:

@@ -1,0 +1,50 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:f="sap.ui.layout.form"
+    xmlns:layout="sap.ui.layout">
+
+    <Dialog id="LogWorkDialog" title="Log Work for: {/newWorkLog/taskName}" contentWidth="34rem" class="sapUiContentPadding">
+        <content>
+            <VBox class="sapUiSmallMargin">
+
+                <!-- Read-only context info -->
+                <layout:Grid defaultSpan="L6 M6 S12" class="sapUiSmallMarginBottom">
+                    <VBox>
+                        <Label text="Project" class="lightText textXs" />
+                        <Text text="{/newWorkLog/projectName}" class="boldText" />
+                    </VBox>
+                    <VBox>
+                        <Label text="Employee" class="lightText textXs" />
+                        <Text text="{/newWorkLog/employeeName}" class="boldText" />
+                    </VBox>
+                </layout:Grid>
+
+                <layout:Grid defaultSpan="L6 M6 S12" class="sapUiSmallMarginTop">
+                    <VBox>
+                        <Label text="Date" class="customLabel" required="true" />
+                        <DatePicker value="{/newWorkLog/date}" valueFormat="yyyy-MM-dd" displayFormat="dd/MM/yyyy" width="100%" />
+                    </VBox>
+                    <VBox>
+                        <Label text="Hours Worked" class="customLabel" required="true" />
+                        <Input value="{/newWorkLog/hours}" type="Number" placeholder="e.g. 4" width="100%" class="customInput" />
+                    </VBox>
+                </layout:Grid>
+
+
+
+                <Label text="Description of Work" class="customLabel sapUiSmallMarginTop" required="true" />
+                <TextArea value="{/newWorkLog/description}" rows="3" width="100%" placeholder="What did you accomplish?" />
+
+            </VBox>
+        </content>
+        <footer>
+            <Toolbar>
+                <ToolbarSpacer />
+                <Button text="Save Work Log" press="onSaveWorkLog" class="customPrimaryBtn" />
+                <Button text="Cancel" press="onCloseWorkLogDialog" class="customCancelBtn" />
+            </Toolbar>
+        </footer>
+    </Dialog>
+
+</core:FragmentDefinition>

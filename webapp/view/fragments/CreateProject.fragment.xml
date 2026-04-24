@@ -1,5 +1,5 @@
 <core:FragmentDefinition xmlns="sap.m" xmlns:core="sap.ui.core" xmlns:layout="sap.ui.layout">
-    <Dialog id="CreateProjectDialog" title="{= ${/editingProjectId} ? 'Edit Project' : 'Define New Project' }" contentWidth="480px">
+    <Dialog id="CreateProjectDialog" title="{= ${/editingProjectId} ? 'Edit Project' : 'Define New Project' }" contentWidth="30rem">
         <content>
             <ScrollContainer height="100%" vertical="true" horizontal="false">
                 <VBox class="sapUiSmallMargin">
@@ -13,7 +13,7 @@
                 </HBox>
                 <Input value="{/newProject/budget}" type="Number" placeholder="Auto Calculated from Actuals..." class="customInput sapUiSmallMarginBottom" />
 
-                <layout:Grid defaultSpan="L6 M6 S6" class="sapUiNoMarginTop">
+                <layout:Grid defaultSpan="L6 M6 S12" class="sapUiNoMarginTop">
                     <VBox>
                         <Label text="Start Date" required="true" class="customLabel"/>
                         <DatePicker value="{/newProject/startDate}" valueFormat="yyyy-MM-dd" displayFormat="MM/dd/yyyy" placeholder="mm/dd/yyyy" class="customInput w-full" />
@@ -24,31 +24,23 @@
                     </VBox>
                 </layout:Grid>
 
-                <VBox class="sapUiSmallMarginTop">
-                    <Label text="Templates" class="customLabel" />
-                    <Select items="{path: '/templates'}" selectedKey="{/newProject/templateId}" forceSelection="false" width="100%" class="customInput">
-                        <core:Item key="{id}" text="{name}" />
-                    </Select>
-                </VBox>
 
-                <VBox class="customDivider sapUiSmallMarginTopBottom" width="100%"></VBox>
 
                 <HBox justifyContent="SpaceBetween" alignItems="Center">
                     <Label text="Required Resources" class="customLabel"/>
-                    <HBox alignItems="Center">
-                        <Input value="{/newCustomRole}" placeholder="New Role..." width="6.5rem" class="customInput textXsInput sapUiTinyMarginEnd" />
-                        <Button text="+" press="onAddCustomRole" class="darkGreyBtn sapUiTinyMarginEnd" />
-                        <Button text="+ Add Req" press="onAddRoleToProject" class="lightBlueBtn" />
-                    </HBox>
+                    <Button text="+ Add Req" press="onAddRoleToProject" class="lightBlueBtn" />
                 </HBox>
 
                 <Text text="No specific resource roles defined." visible="{= ${/newProject/requiredRoles}.length === 0 }" class="lightText italicText sapUiSmallMarginTop" />
 
                 <VBox items="{/newProject/requiredRoles}" class="sapUiTinyMarginTop">
                     <HBox alignItems="Center" class="sapUiTinyMarginBottom" width="100%">
-                        <ComboBox selectedKey="{role}" items="{path: '/availableRoles', templateShareable: true}" class="customInput sapUiTinyMarginEnd" width="100%">
+                        <Select selectedKey="{role}" items="{path: '/availableRoles', templateShareable: true}" forceSelection="false" class="customInput sapUiTinyMarginEnd forceWhiteSelect" width="100%">
+                            <layoutData>
+                                <FlexItemData growFactor="1" />
+                            </layoutData>
                             <core:Item key="{}" text="{}" />
-                        </ComboBox>
+                        </Select>
                         <Input value="{count}" type="Number" placeholder="Qty" class="customInput sapUiTinyMarginEnd" width="4rem" />
                         <Button icon="sap-icon://delete" press="onDeleteRoleFromProject" type="Transparent" class="actionDelete" tooltip="Remove role" />
                     </HBox>

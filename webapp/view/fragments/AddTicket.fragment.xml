@@ -1,0 +1,57 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:layout="sap.ui.layout">
+
+    <Dialog id="AddTicketDialog" title="Add Ticket" contentWidth="34rem" class="sapUiContentPadding">
+        <content>
+            <VBox class="sapUiSmallMargin">
+
+                <layout:Grid defaultSpan="L6 M6 S12" class="sapUiSmallMarginBottom">
+                    <VBox>
+                        <Label text="Date" class="customLabel" required="true" />
+                        <DatePicker value="{/newTicket/date}" valueFormat="yyyy-MM-dd" displayFormat="dd/MM/yyyy" width="100%" class="customInput" />
+                    </VBox>
+                    <VBox>
+                        <Label text="Ticket No / Ref" class="customLabel" required="true" />
+                        <Input value="{/newTicket/ticketNo}" placeholder="e.g. INC12345" width="100%" class="customInput" />
+                    </VBox>
+                </layout:Grid>
+
+                <VBox class="sapUiSmallMarginBottom" width="100%">
+                    <Label text="Module" class="customLabel" required="true" />
+                    <Select selectedKey="{/newTicket/module}" items="{path: '/availableRoles', templateShareable: true}" forceSelection="false" width="100%" class="forceWhiteSelect">
+                        <core:Item key="{}" text="{}" />
+                    </Select>
+                </VBox>
+
+                <layout:Grid defaultSpan="L6 M6 S12" class="sapUiSmallMarginBottom">
+                    <VBox>
+                        <Label text="Resource" class="customLabel" required="true" />
+                        <Select selectedKey="{/newTicket/resourceId}" items="{path: '/resources', templateShareable: true}" forceSelection="false" width="100%" class="forceWhiteSelect">
+                            <core:Item key="{id}" text="{name}" />
+                        </Select>
+                    </VBox>
+                    <VBox>
+                        <Label text="On Behalf Of" class="customLabel" />
+                        <Select selectedKey="{/newTicket/onBehalfOfId}" items="{path: '/resources', templateShareable: true}" forceSelection="false" width="100%" class="forceWhiteSelect">
+                            <core:Item key="{id}" text="{name}" />
+                        </Select>
+                    </VBox>
+                </layout:Grid>
+
+                <Label text="Ticket Description" class="customLabel" required="true" />
+                <TextArea value="{/newTicket/description}" rows="3" width="100%" placeholder="Describe the ticket..." class="customInput" />
+
+            </VBox>
+        </content>
+        <footer>
+            <Toolbar>
+                <ToolbarSpacer />
+                <Button text="Save Ticket" press="onSaveTicket" class="customPrimaryBtn" />
+                <Button text="Cancel" press="onCloseAddTicketDialog" class="customCancelBtn" />
+            </Toolbar>
+        </footer>
+    </Dialog>
+
+</core:FragmentDefinition>

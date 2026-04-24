@@ -105,6 +105,9 @@ sap.ui.define([
 
                 filters: { projectId: "", resourceId: "" },
 
+                tickets: [],
+                newTicket: { date: "", module: "", ticketNo: "", description: "", resourceId: "", onBehalfOfId: "" },
+
                 analytics: {
                     enrichedProjects: [], enrichedResources: [], projectionsByProject: [], projectionsByResource: [], summary: {}
                 },
@@ -128,7 +131,14 @@ sap.ui.define([
                 timelineData: { tasks: [], weeks: [] },
                 timelineResourceData: [],
                 employeeSelectedResourceId: "",
-                employeeTasks: []
+                onBehalfOfId: "",
+                employeeTasks: [],
+
+                timesheets: [], // actually EDiaryView now
+                timesheetsForDisplay: [],
+                timesheetFilters: { projectId: "", employeeId: "", taskId: "" },
+                timesheetSummary: { totalEntries: 0, totalHours: 0, billableHours: 0, nonBillableHours: 0 },
+                newWorkLog: {}
             };
 
             const oModel = new JSONModel(oData);
@@ -156,7 +166,9 @@ sap.ui.define([
                     aTemplatesRaw,
                     aTemplatePhasesRaw,
                     aTemplateTasksRaw,
-                    aWbsTasksRaw
+                    aWbsTasksRaw,
+                    aWorkLogsRaw,
+                    aEDiaryViewRaw
                 ] = await Promise.all([
                     loadList("/Projects"),
                     loadList("/Resources"),
@@ -166,7 +178,9 @@ sap.ui.define([
                     loadList("/Templates"),
                     loadList("/TemplatePhases"),
                     loadList("/TemplateTasks"),
-                    loadList("/WBSTasks")
+                    loadList("/WBSTasks"),
+                    loadList("/WorkLogs"),
+                    loadList("/EDiaryView")
                 ]);
 
                 const mProjRolesByProject = {};
@@ -304,9 +318,39 @@ sap.ui.define([
                         endDate: w.endDate,
                         status: w.status || 'Not Started',
                         sequence: w.sequence,
-                        predecessor: w.predecessor_ID || ''
+                        predecessor: w.predecessor_ID || '',
+                        reallocatedToId: w.reallocatedTo_ID || ''
                     };
                 });
+
+                // --- Map WorkLogs ---
+                const aWorkLogs = aWorkLogsRaw.map(wl => ({
+                    id: wl.ID,
+                    wbs_ID: wl.wbs_ID,
+                    employee_ID: wl.employee_ID,
+                    date: wl.date,
+                    hours: Number(wl.hours) || 0,
+                    isBillable: wl.isBillable,
+                    nonBillableType: wl.nonBillableType,
+                    description: wl.description
+                }));
+
+                // --- Map EDiaryView ---
+                const aEDiaryView = aEDiaryViewRaw.map(ed => ({
+                    id: ed.ID,
+                    date: ed.date,
+                    hours: Number(ed.hours) || 0,
+                    isBillable: ed.isBillable,
+                    nonBillableType: ed.nonBillableType,
+                    description: ed.description,
+                    employeeId: ed.employeeId,
+                    employeeName: ed.employeeName,
+                    wbsId: ed.wbsId,
+                    taskName: ed.taskName,
+                    phaseName: ed.phaseName,
+                    projectId: ed.projectId,
+                    projectName: ed.projectName
+                }));
 
                 oViewModel.setProperty("/projects", aProjects);
                 oViewModel.setProperty("/resources", aResources);
@@ -314,10 +358,16 @@ sap.ui.define([
                 oViewModel.setProperty("/availableRoles", Array.from(oRoleSet));
                 oViewModel.setProperty("/templates", aTemplates);
                 oViewModel.setProperty("/wbsTasks", aWbsTasks);
+                oViewModel.setProperty("/workLogs", aWorkLogs);
+                oViewModel.setProperty("/eDiaryView", aEDiaryView);
 
                 this._calculateAnalytics();
                 this._computeWbsTasks();
                 this._computeTimelineData();
+                this._computeTimesheetData(); // This will just format and filter EDiaryView
+                if (this.getView().getModel().getProperty("/employeeSelectedResourceId")) {
+                    this._computeEmployeeTasks();
+                }
             } catch (e) {
                 MessageToast.show("Failed to load data from service");
                 // eslint-disable-next-line no-console
@@ -1525,12 +1575,21 @@ sap.ui.define([
             const pid = oModel.getProperty("/wbsSelectedProjectId");
             const allTasks = oModel.getProperty("/wbsTasks") || [];
 
-            const filteredTasks = allTasks.filter(t => t.projectId === pid).map((t, idx) => {
-                t.index = idx + 1;
-                t.startDateEdit = t.startDate ? t.startDate.slice(0, 10) : "";
-                t.endDateEdit = t.endDate ? t.endDate.slice(0, 10) : "";
-                return t;
-            });
+            const filteredTasks = allTasks.filter(t => t.projectId === pid)
+                .sort((a, b) => {
+                    const phaseA = a.phaseName || "";
+                    const phaseB = b.phaseName || "";
+                    // Group by exact phase name alphabetically
+                    if (phaseA < phaseB) return -1;
+                    if (phaseA > phaseB) return 1;
+                    // Secondary sort by sequence integer
+                    return (a.sequence || 0) - (b.sequence || 0);
+                }).map((t, idx) => {
+                    t.index = idx + 1;
+                    t.startDateEdit = t.startDate ? t.startDate.slice(0, 10) : "";
+                    t.endDateEdit = t.endDate ? t.endDate.slice(0, 10) : "";
+                    return t;
+                });
             oModel.setProperty("/wbsTasksForSelectedProject", filteredTasks);
         },
 
@@ -1607,6 +1666,48 @@ sap.ui.define([
                 MessageToast.show("Failed to add WBS task");
                 console.error("Error adding WBS task", e);
             }
+        },
+
+        onDeleteAllWbsTasks: function () {
+            const oModel = this.getView().getModel();
+            const projId = oModel.getProperty("/wbsSelectedProjectId");
+
+            if (!projId) return;
+
+            sap.m.MessageBox.warning("Are you sure you want to delete ALL tasks for this project? This will permanently wipe them from the database.", {
+                title: "Delete All Tasks",
+                actions: [sap.m.MessageBox.Action.DELETE, sap.m.MessageBox.Action.CANCEL],
+                emphasizedAction: sap.m.MessageBox.Action.CANCEL,
+                onClose: async (sAction) => {
+                    if (sAction === sap.m.MessageBox.Action.DELETE) {
+                        try {
+                            const oODataModel = this._getODataModel();
+                            const oListBinding = oODataModel.bindList("/WBSTasks");
+                            const aContexts = await oListBinding.requestContexts(0, 5000);
+
+                            let count = 0;
+                            aContexts.forEach(c => {
+                                const obj = c.getObject ? c.getObject() : {};
+                                if (obj.project_ID === projId && c.delete) {
+                                    c.delete(BATCH_GROUP);
+                                    count++;
+                                }
+                            });
+
+                            if (count > 0) {
+                                await oODataModel.submitBatch(BATCH_GROUP);
+                                sap.m.MessageToast.show(`Successfully deleted all ${count} tasks`);
+                                await this._loadBackendData();
+                            } else {
+                                sap.m.MessageToast.show("No tasks found to delete for this project");
+                            }
+                        } catch (e) {
+                            console.error("Error deleting all tasks", e);
+                            sap.m.MessageToast.show("Failed to clear tasks from database");
+                        }
+                    }
+                }
+            });
         },
 
         onRemoveWbsTask: function (oEvent) {
@@ -2008,7 +2109,273 @@ sap.ui.define([
             reader.readAsText(file);
         },
 
-        // --- Timeline Logic ---
+        onImportCSV: function () {
+            // Trigger the hidden FileUploader's file dialog
+            var oFileUploader = this.byId("wbsExcelFileUploader");
+            if (oFileUploader) {
+                // Access the internal file input and click it
+                var oDomRef = oFileUploader.getDomRef();
+                if (oDomRef) {
+                    var oInput = oDomRef.querySelector("input[type='file']");
+                    if (oInput) {
+                        oInput.click();
+                        return;
+                    }
+                }
+                // Fallback: use FeedInput or create a temporary file input
+                var oTempInput = document.createElement("input");
+                oTempInput.type = "file";
+                oTempInput.accept = ".xlsx,.xls,.csv";
+                oTempInput.style.display = "none";
+                document.body.appendChild(oTempInput);
+
+                var that = this;
+                oTempInput.addEventListener("change", function (evt) {
+                    var file = evt.target.files[0];
+                    if (file) {
+                        that._processImportedFile(file);
+                    }
+                    document.body.removeChild(oTempInput);
+                });
+                oTempInput.click();
+            }
+        },
+
+        onImportExcelFile: function (oEvent) {
+            var aFiles = oEvent.getParameter("files");
+            var file = aFiles && aFiles[0];
+            if (!file) return;
+            this._processImportedFile(file);
+        },
+
+        _loadXLSXLibrary: function () {
+            // Dynamically load SheetJS if not already available
+            return new Promise(function (resolve, reject) {
+                if (window.XLSX) {
+                    resolve(window.XLSX);
+                    return;
+                }
+                var script = document.createElement("script");
+                script.src = "https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js";
+                script.onload = function () {
+                    if (window.XLSX) {
+                        resolve(window.XLSX);
+                    } else {
+                        reject(new Error("XLSX library failed to initialize"));
+                    }
+                };
+                script.onerror = function () {
+                    reject(new Error("Failed to load XLSX library from CDN"));
+                };
+                document.head.appendChild(script);
+            });
+        },
+
+        _processImportedFile: function (file) {
+            var oModel = this.getView().getModel();
+            var projId = oModel.getProperty("/wbsSelectedProjectId");
+            if (!projId) {
+                MessageToast.show("Please select a project first.");
+                return;
+            }
+
+            var that = this;
+
+            this._loadXLSXLibrary().then(function (XLSX) {
+                var reader = new FileReader();
+
+                reader.onload = function (e) {
+                    try {
+                        var data = new Uint8Array(e.target.result);
+                        var workbook = XLSX.read(data, { type: "array" });
+                        var sheetName = workbook.SheetNames[0];
+                        var worksheet = workbook.Sheets[sheetName];
+                        var jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+                        if (!jsonData || jsonData.length === 0) {
+                            MessageToast.show("File is empty or has invalid format.");
+                            return;
+                        }
+
+                        that._importExcelRows(jsonData, projId);
+                    } catch (err) {
+                        MessageToast.show("Failed to parse file. Please ensure it is a valid Excel/CSV file.");
+                        console.error("Error parsing imported file", err);
+                    }
+                };
+
+                reader.readAsArrayBuffer(file);
+            }).catch(function (err) {
+                MessageToast.show("Failed to load Excel parsing library.");
+                console.error("XLSX library load error", err);
+            });
+        },
+
+        _findColumnValue: function (row, candidates) {
+            // Try to find a column value by checking multiple candidate header names (case-insensitive)
+            var keys = Object.keys(row);
+            for (var i = 0; i < candidates.length; i++) {
+                var candidate = candidates[i].toLowerCase();
+                for (var j = 0; j < keys.length; j++) {
+                    if (keys[j].toLowerCase().trim() === candidate) {
+                        return (row[keys[j]] || "").toString().trim();
+                    }
+                }
+            }
+            return "";
+        },
+
+        _importExcelRows: async function (jsonData, projId) {
+            var oModel = this.getView().getModel();
+            var projects = oModel.getProperty("/projects") || [];
+            var resources = oModel.getProperty("/resources") || [];
+            var proj = projects.find(function (p) { return p.id === projId; });
+
+            if (!proj) {
+                MessageToast.show("Selected project not found.");
+                return;
+            }
+
+            var projectStartDate = proj.startDate || "";
+            var oODataModel = this._getODataModel();
+            var existingTasks = (oModel.getProperty("/wbsTasks") || []).filter(function (t) { return t.projectId === projId; });
+            var seq = existingTasks.length;
+
+            // Track per-resource latest end date for chaining
+            var resourceEndDateMap = {};
+
+            // First, build up the end dates from existing tasks for each resource
+            existingTasks.forEach(function (t) {
+                if (t.resourceId && t.endDate) {
+                    if (!resourceEndDateMap[t.resourceId] || t.endDate > resourceEndDateMap[t.resourceId]) {
+                        resourceEndDateMap[t.resourceId] = t.endDate;
+                    }
+                }
+            });
+
+            // Parse all rows first to calculate dates correctly with resource chaining
+            var parsedTasks = [];
+            var that = this;
+
+            jsonData.forEach(function (row) {
+                var phaseName = that._findColumnValue(row, ["phase / criticality", "phase/criticality", "phase", "criticality"]);
+                var taskName = that._findColumnValue(row, ["task name", "task", "name"]);
+                var hoursStr = that._findColumnValue(row, ["hrs", "hours", "hour", "default hours"]);
+                var predecessorStr = that._findColumnValue(row, ["predecessor", "predecessors", "pred"]);
+                var resourceName = that._findColumnValue(row, ["resource", "resource name", "assigned resource", "resources"]);
+
+                if (!taskName) return; // Skip rows without a task name
+
+                var hours = parseInt(hoursStr) || 8;
+                var predecessor = predecessorStr ? predecessorStr.toString().trim() : "";
+
+                // Find matching resource by name (case-insensitive)
+                var matchedResource = null;
+                if (resourceName) {
+                    matchedResource = resources.find(function (r) {
+                        return r.name.toLowerCase().trim() === resourceName.toLowerCase().trim();
+                    });
+                }
+
+                var resourceId = matchedResource ? matchedResource.id : null;
+
+                // Calculate start date based on resource chaining
+                var startDate = "";
+                if (resourceId && resourceEndDateMap[resourceId]) {
+                    // Same resource has a previous task — chain from its end date
+                    startDate = that.getNextWorkingDay(resourceEndDateMap[resourceId]);
+                } else {
+                    // First task for this resource or no resource — use project start date
+                    startDate = projectStartDate;
+                }
+
+                // Calculate end date based on hours
+                var endDate = that.calculateEndDate(startDate, hours);
+
+                // Update the resource end date map for chaining
+                if (resourceId) {
+                    resourceEndDateMap[resourceId] = endDate;
+                }
+
+                seq++;
+                parsedTasks.push({
+                    projectId: projId,
+                    phaseName: phaseName || "Imported Phase",
+                    name: taskName,
+                    hours: hours,
+                    predecessor: predecessor,
+                    resourceId: resourceId,
+                    startDate: startDate,
+                    endDate: endDate,
+                    sequence: seq
+                });
+            });
+
+            if (parsedTasks.length === 0) {
+                MessageToast.show("No valid tasks found in the file. Please check column headers.");
+                return;
+            }
+
+            // Create all tasks in OData backend
+            try {
+                parsedTasks.forEach(function (task) {
+                    // Truncate strings to fit backend schema limits
+                    var safeName = (task.name || "").substring(0, 100);
+                    var safePhase = (task.phaseName || "").substring(0, 100);
+                    var safePredecessor = (task.predecessor || "").substring(0, 100);
+
+                    that._createEntry(oODataModel, "/WBSTasks", {
+                        project_ID: task.projectId,
+                        phaseName: safePhase,
+                        name: safeName,
+                        role: "",
+                        resource_ID: task.resourceId,
+                        hours: task.hours,
+                        startDate: that._formatDateForOData(task.startDate),
+                        endDate: that._formatDateForOData(task.endDate),
+                        status: "Not Started",
+                        sequence: task.sequence,
+                        predecessor_ID: safePredecessor || null
+                    });
+                });
+
+                await oODataModel.submitBatch(BATCH_GROUP);
+                MessageToast.show("Successfully imported " + parsedTasks.length + " tasks from file.");
+                await this._loadBackendData();
+            } catch (err) {
+                MessageToast.show("Failed to import tasks from file.");
+                console.error("Error importing tasks from Excel", err);
+            }
+        },
+
+        // --- Timeline & WBS Logic ---
+        onUpdateWbsTaskReallocation: async function (oEvent) {
+            const oContext = oEvent.getSource().getBindingContext();
+            const sTaskId = oContext.getProperty("id");
+            const sStatus = oContext.getProperty("status");
+
+            if (sStatus === "Completed") {
+                sap.m.MessageBox.error("This task is already marked as 'Completed'. You cannot reallocate a completed task.");
+                this._loadBackendData(); // Revert the UI to backend state
+                return;
+            }
+
+            const newReallocatedToId = oEvent.getParameter("selectedItem") ? oEvent.getParameter("selectedItem").getKey() : null;
+
+            const oODataModel = this._getODataModel();
+            const oBoundCtx = oODataModel.bindContext("/WBSTasks(" + sTaskId + ")").getBoundContext();
+            oBoundCtx.setProperty("reallocatedTo_ID", newReallocatedToId || null);
+
+            try {
+                await oODataModel.submitBatch(BATCH_GROUP);
+                sap.m.MessageToast.show("Task reallocation saved");
+                await this._loadBackendData();
+            } catch (e) {
+                sap.m.MessageToast.show("Failed to assign new reallocation");
+                console.error(e);
+            }
+        },
+
         onTimelineProjectChange: function () {
             this._computeTimelineData();
         },
@@ -2209,6 +2576,7 @@ sap.ui.define([
             return DateFormat.getDateInstance({ style: "medium" }).format(oDate);
         },
         onEmployeeResourceChange: function () {
+            this.getView().getModel().setProperty("/onBehalfOfId", ""); // Reset on behalf when primary changes
             this._computeEmployeeTasks();
         },
 
@@ -2224,26 +2592,48 @@ sap.ui.define([
 
             const allTasks = oModel.getProperty("/wbsTasks") || [];
             const projects = oModel.getProperty("/projects") || [];
+            const workLogs = oModel.getProperty("/workLogs") || [];
+            const resources = oModel.getProperty("/resources") || [];
             const timeData = this._getTimeTrackingData();
 
             const employeeTasks = allTasks
-                .filter(t => t.resourceId === resourceId)
+                .filter(t => t.resourceId === resourceId || t.reallocatedToId === resourceId)
                 .map(t => {
                     const proj = projects.find(p => p.id === t.projectId);
+
+                    let reallocationStatusText = "";
+                    let isReallocatedToSomeoneElse = false;
+
+                    if (t.resourceId === resourceId && t.reallocatedToId && t.reallocatedToId !== resourceId) {
+                        const targetRes = resources.find(r => r.id === t.reallocatedToId);
+                        reallocationStatusText = "Reallocated To: " + (targetRes ? targetRes.name : "Unknown");
+                        isReallocatedToSomeoneElse = true;
+                    } else if (t.reallocatedToId === resourceId && t.resourceId !== resourceId) {
+                        const sourceRes = resources.find(r => r.id === t.resourceId);
+                        reallocationStatusText = "Reallocated From: " + (sourceRes ? sourceRes.name : "Unknown");
+                    }
+
+                    // Sum previously formally logged hours from database
+                    const dbHours = workLogs
+                        .filter(wl => wl.wbs_ID === t.id && wl.employee_ID === resourceId)
+                        .reduce((s, wl) => s + (wl.hours || 0), 0);
+
+                    // Add current unlogged timer time
                     const td = timeData[t.id] || {};
-                    const workedHours = td.workedHours || 0;
+                    const unloggedHours = td.workedHours || 0;
                     const startedAt = td.startedAt || null;
 
-                    // Calculate live elapsed if task is currently running
-                    let liveHours = workedHours;
-                    if (startedAt && t.status === "In Progress") {
+                    let liveHours = dbHours + unloggedHours;
+                    if (startedAt && t.status === "Working") {
                         liveHours += (Date.now() - startedAt) / 3600000;
                     }
 
                     return {
                         ...t,
                         projectName: proj ? proj.name : "Unknown",
-                        workedHours: workedHours,
+                        reallocationStatusText: reallocationStatusText,
+                        isReallocatedToSomeoneElse: isReallocatedToSomeoneElse,
+                        workedHours: liveHours,
                         liveWorkedHours: Math.round(liveHours * 100) / 100,
                         elapsedDisplay: this._formatElapsed(liveHours),
                         startedAt: startedAt,
@@ -2258,8 +2648,12 @@ sap.ui.define([
             const totalPlannedHours = employeeTasks.reduce((s, t) => s + (t.hours || 0), 0);
             const totalWorkedHours = employeeTasks.reduce((s, t) => s + (t.liveWorkedHours || 0), 0);
             const completedCount = employeeTasks.filter(t => t.status === "Completed").length;
-            const inProgressCount = employeeTasks.filter(t => t.status === "In Progress").length;
+            const inProgressCount = employeeTasks.filter(t => t.status === "Working").length;
             const totalCount = employeeTasks.length;
+
+            const nonBillableLogs = workLogs.filter(wl => wl.employee_ID === resourceId && wl.isBillable === false);
+            const totalNonBillableHours = nonBillableLogs.reduce((s, wl) => s + (wl.hours || 0), 0);
+            oModel.setProperty("/employeeNonBillableLogs", nonBillableLogs);
 
             oModel.setProperty("/employeeTimeSummary", {
                 totalPlannedHours: totalPlannedHours,
@@ -2267,11 +2661,11 @@ sap.ui.define([
                 completedCount: completedCount,
                 inProgressCount: inProgressCount,
                 totalCount: totalCount,
-                completionPercent: totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
+                completionPercent: totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0,
+                totalNonBillableHours: totalNonBillableHours
             });
 
-            // Start timer if any task is running
-            if (employeeTasks.some(t => t.status === "In Progress")) {
+            if (employeeTasks.some(t => t.status === "Working")) {
                 this._startEmployeeTimer();
             } else {
                 this._stopEmployeeTimer();
@@ -2286,9 +2680,7 @@ sap.ui.define([
         },
 
         _getTimeTrackingData: function () {
-            try {
-                return JSON.parse(localStorage.getItem("employeeTimeTracking") || "{}");
-            } catch (e) { return {}; }
+            try { return JSON.parse(localStorage.getItem("employeeTimeTracking") || "{}"); } catch (e) { return {}; }
         },
 
         _saveTimeTrackingData: function (data) {
@@ -2300,7 +2692,7 @@ sap.ui.define([
             const that = this;
             this._employeeTimerInterval = setInterval(function () {
                 that._computeEmployeeTasks();
-            }, 60000); // update every minute
+            }, 60000);
         },
 
         _stopEmployeeTimer: function () {
@@ -2310,22 +2702,16 @@ sap.ui.define([
             }
         },
 
-        _updateEmployeeTaskStatus: async function (oEvent, sNewStatus) {
-            const oContext = oEvent.getSource().getBindingContext();
-            const task = oContext.getObject();
+        _updateEmployeeTaskStatus: async function (task, sNewStatus) {
             const now = Date.now();
-
-            // Update time tracking data
             const timeData = this._getTimeTrackingData();
             if (!timeData[task.id]) {
                 timeData[task.id] = { workedHours: 0, startedAt: null };
             }
 
-            if (sNewStatus === "In Progress") {
-                // Starting or resuming — record the start timestamp
+            if (sNewStatus === "Working") {
                 timeData[task.id].startedAt = now;
             } else if (sNewStatus === "Paused" || sNewStatus === "Completed") {
-                // Pausing or completing — accumulate elapsed time
                 if (timeData[task.id].startedAt) {
                     const elapsed = (now - timeData[task.id].startedAt) / 3600000;
                     timeData[task.id].workedHours = (timeData[task.id].workedHours || 0) + elapsed;
@@ -2334,7 +2720,7 @@ sap.ui.define([
             }
             this._saveTimeTrackingData(timeData);
 
-            // Update locally
+            // Update models
             const oModel = this.getView().getModel();
             const employeeTasks = oModel.getProperty("/employeeTasks") || [];
             const empIdx = employeeTasks.findIndex(t => t.id === task.id);
@@ -2343,7 +2729,6 @@ sap.ui.define([
                 oModel.setProperty("/employeeTasks", [...employeeTasks]);
             }
 
-            // Update in main wbsTasks array
             const allTasks = oModel.getProperty("/wbsTasks") || [];
             const mainIdx = allTasks.findIndex(t => t.id === task.id);
             if (mainIdx > -1) {
@@ -2351,32 +2736,651 @@ sap.ui.define([
                 oModel.setProperty("/wbsTasks", allTasks);
             }
 
-            // Persist status to backend
             const oODataModel = this._getODataModel();
             try {
                 const oCtx = oODataModel.bindContext("/WBSTasks(" + task.id + ")").getBoundContext();
                 oCtx.setProperty("status", sNewStatus);
                 await oODataModel.submitBatch(BATCH_GROUP);
-                MessageToast.show("Task " + sNewStatus);
             } catch (e) {
-                MessageToast.show("Failed to update task status");
                 console.error("Error updating task status", e);
             }
-
-            // Recompute to refresh the time display
             this._computeEmployeeTasks();
+            this._computeTimesheetData();
+        },
+
+
+
+        onEmployeeTaskEditDialog: function (oEvent) {
+            const task = oEvent.getSource().getBindingContext().getObject();
+            const oModel = this.getView().getModel();
+            
+            // Find existing work log for this task
+            const workLogs = oModel.getProperty("/workLogs") || [];
+            const employeeId = oModel.getProperty("/employeeSelectedResourceId");
+            const existingLogs = workLogs.filter(wl => wl.wbs_ID === task.id && wl.employee_ID === employeeId);
+            existingLogs.sort((a, b) => new Date(b.date) - new Date(a.date));
+            const latestLog = existingLogs[0];
+
+            task.logHours = latestLog ? latestLog.hours : "";
+            task.logDescription = latestLog ? latestLog.description : "";
+            task.existingLogId = latestLog ? (latestLog.ID || latestLog.id) : null;
+
+            this.getView().getModel().setProperty("/editingEmployeeTask", Object.assign({}, task));
+            this._openDialog("EditEmployeeTask");
+        },
+
+        onCloseEmployeeTaskEdit: function (oEvent) {
+            oEvent.getSource().getParent().close();
+        },
+
+        onSaveEmployeeTaskEdit: async function (oEvent) {
+            const oModel = this.getView().getModel();
+            const editedTask = oModel.getProperty("/editingEmployeeTask");
+            
+            if (!editedTask.logHours || !editedTask.logDescription) {
+                sap.m.MessageToast.show("Please enter hours and description");
+                return;
+            }
+
+            const oODataModel = this._getODataModel();
+            try {
+                if (editedTask.existingLogId) {
+                    const oBoundCtx = oODataModel.bindContext("/WorkLogs(" + editedTask.existingLogId + ")").getBoundContext();
+                    oBoundCtx.setProperty("hours", parseFloat(editedTask.logHours) || 0);
+                    oBoundCtx.setProperty("description", editedTask.logDescription);
+                } else {
+                    this._createEntry(oODataModel, "/WorkLogs", {
+                        wbs_ID: editedTask.id,
+                        employee_ID: oModel.getProperty("/employeeSelectedResourceId"),
+                        date: this._formatDateForOData(new Date()),
+                        hours: parseFloat(editedTask.logHours) || 0,
+                        isBillable: true,
+                        nonBillableType: null,
+                        description: editedTask.logDescription
+                    });
+                }
+                await oODataModel.submitBatch(BATCH_GROUP);
+                sap.m.MessageToast.show("Work log saved successfully");
+                oEvent.getSource().getParent().close();
+                await this._loadBackendData();
+            } catch (e) {
+                console.error("Error saving work log from task edit", e);
+                sap.m.MessageToast.show("Failed to save work log");
+            }
         },
 
         onEmployeeTaskStart: function (oEvent) {
-            this._updateEmployeeTaskStatus(oEvent, "In Progress");
+            const task = oEvent.getSource().getBindingContext().getObject();
+            this._updateEmployeeTaskStatus(task, "Working");
         },
 
         onEmployeeTaskPause: function (oEvent) {
-            this._updateEmployeeTaskStatus(oEvent, "Paused");
+            const task = oEvent.getSource().getBindingContext().getObject();
+            this._updateEmployeeTaskStatus(task, "Paused");
         },
 
         onEmployeeTaskStop: function (oEvent) {
-            this._updateEmployeeTaskStatus(oEvent, "Completed");
+            const task = oEvent.getSource().getBindingContext().getObject();
+            sap.m.MessageBox.confirm("Do you want to log your work?", {
+                title: "Log Work",
+                actions: [sap.m.MessageBox.Action.YES, sap.m.MessageBox.Action.NO],
+                emphasizedAction: sap.m.MessageBox.Action.YES,
+                onClose: (sAction) => {
+                    if (sAction === sap.m.MessageBox.Action.YES) {
+                        this._updateEmployeeTaskStatus(task, "Paused");
+                        this._startLogWorkFlow(task);
+                    } else {
+                        // Just stop timer and keep it Paused instead of completing
+                        this._updateEmployeeTaskStatus(task, "Paused");
+                    }
+                }
+            });
+        },
+
+        _startLogWorkFlow: function (task) {
+            const oModel = this.getView().getModel();
+
+            // Check if there are any unlogged hours in local storage
+            const timeData = this._getTimeTrackingData();
+            const unloggedHours = (timeData[task.id] && timeData[task.id].workedHours) ? timeData[task.id].workedHours : 0;
+
+            // Format to 2 decimal places if there's unlogged time
+            const initialHours = unloggedHours > 0 ? (Math.round(unloggedHours * 100) / 100).toString() : "";
+
+            const today = new Date();
+            const todayStr = today.getFullYear() + "-" +
+                String(today.getMonth() + 1).padStart(2, '0') + "-" +
+                String(today.getDate()).padStart(2, '0');
+
+            const activeEmployeeId = oModel.getProperty("/employeeSelectedResourceId");
+            const resources = oModel.getProperty("/resources") || [];
+            const activeEmp = resources.find(r => r.id === activeEmployeeId);
+
+            oModel.setProperty("/newWorkLog", {
+                taskId: task.id, // Keep track of the task ID 
+                taskName: task.name,
+                projectName: task.projectName,
+                projectId: task.projectId,
+                employeeId: activeEmployeeId,
+                employeeName: activeEmp ? activeEmp.name : activeEmployeeId,
+                date: todayStr,
+                hours: initialHours,
+                isBillable: true,
+                nonBillableType: "",
+                description: ""
+            });
+
+            this._openDialog("LogWork");
+        },
+
+        onSaveWorkLog: async function () {
+            const oModel = this.getView().getModel();
+            const wl = oModel.getProperty("/newWorkLog");
+
+            if (!wl.date || !wl.hours || !wl.description || (!wl.isBillable && !wl.nonBillableType)) {
+                MessageToast.show("Please fill all required fields");
+                return;
+            }
+
+            const oODataModel = this._getODataModel();
+            try {
+                this._createEntry(oODataModel, "/WorkLogs", {
+                    project_ID: wl.projectId,
+                    wbs_ID: wl.taskId,
+                    employee_ID: wl.employeeId,
+                    date: this._formatDateForOData(wl.date),
+                    hours: parseFloat(wl.hours) || 0,
+                    isBillable: wl.isBillable,
+                    nonBillableType: wl.isBillable ? null : wl.nonBillableType,
+                    description: wl.description
+                });
+
+                await oODataModel.submitBatch(BATCH_GROUP);
+
+                // Clear out local timer if it was logged
+                const timeData = this._getTimeTrackingData();
+                if (timeData[wl.taskId]) {
+                    timeData[wl.taskId].workedHours = 0; // Reset it since it's now in the database
+                    this._saveTimeTrackingData(timeData);
+                }
+
+                this.byId("LogWorkDialog").close();
+                this._updateEmployeeTaskStatus({ id: wl.taskId }, "Completed");
+
+                sap.m.MessageToast.show("Work entry logged successfully");
+                await this._loadBackendData();
+            } catch (e) {
+                MessageToast.show("Failed to save work log");
+                console.error("Error saving work log", e);
+            }
+        },
+
+        onCloseWorkLogDialog: function () {
+            this.byId("LogWorkDialog").close();
+        },
+
+        // ============================================================
+        // Manual Log Work Logic
+        // ============================================================
+
+        onOpenManualLogWork: function () {
+            const oModel = this.getView().getModel();
+            const resourceId = oModel.getProperty("/employeeSelectedResourceId");
+
+            if (!resourceId) {
+                sap.m.MessageToast.show("Please select an employee first");
+                return;
+            }
+
+            const today = new Date();
+            const todayStr = today.getFullYear() + "-" +
+                String(today.getMonth() + 1).padStart(2, '0') + "-" +
+                String(today.getDate()).padStart(2, '0');
+
+            oModel.setProperty("/newManualWorkLog", {
+                employeeId: resourceId,
+                projectId: "",
+                taskId: "",
+                date: todayStr,
+                hours: "",
+                isBillable: true,
+                nonBillableType: "",
+                description: ""
+            });
+
+            // Make sure the dropdown for tasks is initially empty
+            oModel.setProperty("/manualTasks", []);
+
+            // Filter the projects dropdown so it only contains projects this employee has assignments for
+            const allTasks = oModel.getProperty("/wbsTasks") || [];
+            const allProjects = oModel.getProperty("/projects") || [];
+
+            const userProjectIds = new Set(allTasks.filter(t => {
+                // Exclude tasks formally reassigned away
+                if (t.resourceId === resourceId && t.reallocatedToId && t.reallocatedToId !== resourceId) return false;
+
+                // Include explicitly assigned or reassigned to this specific proxy user
+                return t.resourceId === resourceId || t.reallocatedToId === resourceId;
+            }).map(t => t.projectId));
+
+            const manualProjects = allProjects.filter(p => userProjectIds.has(p.id));
+            oModel.setProperty("/manualProjects", manualProjects);
+
+            this._openDialog("ManualLogWork");
+        },
+
+        onManualProjectChange: function (oEvent) {
+            const oModel = this.getView().getModel();
+            const sProjectId = oEvent.getSource().getSelectedKey();
+            const resourceId = oModel.getProperty("/newManualWorkLog/employeeId");
+
+            const allTasks = oModel.getProperty("/wbsTasks") || [];
+            // Filter tasks assigned to this employee on this project
+            const filteredTasks = allTasks.filter(t => {
+                if (t.projectId !== sProjectId) return false;
+
+                // If it belongs to me originally, but I assigned it away, it's locked out.
+                if (t.resourceId === resourceId && t.reallocatedToId && t.reallocatedToId !== resourceId) return false;
+
+                // Include if I am the original owner (and it's not reallocated away), OR if it's reallocated directly to me.
+                return t.resourceId === resourceId || t.reallocatedToId === resourceId;
+            });
+
+            oModel.setProperty("/manualTasks", filteredTasks);
+            oModel.setProperty("/newManualWorkLog/taskId", "");
+        },
+
+        onSaveManualWorkLog: async function () {
+            const oModel = this.getView().getModel();
+            const wl = oModel.getProperty("/newManualWorkLog");
+
+            if (!wl.date || !wl.hours || !wl.description) {
+                sap.m.MessageToast.show("Please fill all required fields");
+                return;
+            }
+            if (wl.isBillable && (!wl.projectId || !wl.taskId)) {
+                sap.m.MessageToast.show("Please select Project and Task for billable work");
+                return;
+            }
+            if (!wl.isBillable && !wl.nonBillableType) {
+                sap.m.MessageToast.show("Please select a Non-Billable Category");
+                return;
+            }
+
+            const oODataModel = this._getODataModel();
+            try {
+                this._createEntry(oODataModel, "/WorkLogs", {
+                    wbs_ID: wl.isBillable ? wl.taskId : null,
+                    employee_ID: wl.employeeId,
+                    date: this._formatDateForOData(wl.date),
+                    hours: parseFloat(wl.hours) || 0,
+                    isBillable: wl.isBillable,
+                    nonBillableType: wl.isBillable ? null : wl.nonBillableType,
+                    description: wl.description
+                });
+
+                await oODataModel.submitBatch(BATCH_GROUP);
+
+                if (wl.isBillable && wl.taskId) {
+                    const allTasks = oModel.getProperty("/wbsTasks") || [];
+                    const matchedTask = allTasks.find(t => t.id === wl.taskId);
+                    if (matchedTask && matchedTask.status !== "Completed") {
+                        this._updateEmployeeTaskStatus(matchedTask, "Completed");
+                    }
+
+                    // Clear out local timer if it was running/paused
+                    const timeData = this._getTimeTrackingData();
+                    if (timeData[wl.taskId]) {
+                        timeData[wl.taskId].workedHours = 0;
+                        timeData[wl.taskId].startedAt = null;
+                        this._saveTimeTrackingData(timeData);
+                    }
+                }
+
+                this.byId("ManualLogWorkDialog").close();
+                sap.m.MessageToast.show("Manual work entry logged successfully");
+                await this._loadBackendData();
+            } catch (e) {
+                sap.m.MessageToast.show("Failed to save work log");
+                console.error("Error saving manual work log", e);
+            }
+        },
+
+        onCloseManualWorkLogDialog: function () {
+            this.byId("ManualLogWorkDialog").close();
+        },
+
+        // ============================================================
+        // E-Diary (Timesheet) Logic
+        // ============================================================
+
+        _computeTimesheetData: function () {
+            const oModel = this.getView().getModel();
+            const eDiaryData = oModel.getProperty("/eDiaryView") || [];
+            const wbsTasks = oModel.getProperty("/wbsTasks") || [];
+            const projects = oModel.getProperty("/projects") || [];
+            const resources = oModel.getProperty("/resources") || [];
+            const filters = oModel.getProperty("/timesheetFilters") || {};
+
+            let enriched = [...eDiaryData];
+
+            // 1. Inject status into existing logs
+            enriched.forEach(log => {
+                log.reallocationStatusText = "";
+                if (!log.wbsId) {
+                    log.status = "None"; // Or whatever fits non-billable
+                    log.projectName = "NA";
+                    log.taskName = "NA";
+                } else {
+                    const matchedTask = wbsTasks.find(t => t.id === log.wbsId);
+                    log.status = matchedTask ? matchedTask.status : "Unknown";
+
+                    if (matchedTask) {
+                        if (matchedTask.resourceId === log.employeeId && matchedTask.reallocatedToId && matchedTask.reallocatedToId !== log.employeeId) {
+                            const targetRes = resources.find(r => r.id === matchedTask.reallocatedToId);
+                            log.reallocationStatusText = "Reallocated To: " + (targetRes ? targetRes.name : "Unknown");
+                        } else if (matchedTask.reallocatedToId === log.employeeId && matchedTask.resourceId !== log.employeeId) {
+                            const sourceRes = resources.find(r => r.id === matchedTask.resourceId);
+                            log.reallocationStatusText = "Reallocated From: " + (sourceRes ? sourceRes.name : "Unknown");
+                        }
+                    }
+                }
+            });
+
+            // 2. Add 'dummy' log rows for assigned tasks that don't have any WorkLogs yet so they show up as 'Not Started' etc.
+            const tasksWithLogs = new Set(enriched.map(log => log.wbsId));
+            const assignedTasks = wbsTasks.filter(t => t.resourceId);
+
+            assignedTasks.forEach(task => {
+                if (!tasksWithLogs.has(task.id)) {
+                    const proj = projects.find(p => p.id === task.projectId);
+                    const res = resources.find(r => r.id === task.resourceId);
+                    
+                    let dummyReallocStr = "";
+                    if (task.reallocatedToId && task.reallocatedToId !== task.resourceId) {
+                        const targetRes = resources.find(r => r.id === task.reallocatedToId);
+                        dummyReallocStr = "Reallocated To: " + (targetRes ? targetRes.name : "Unknown");
+                    }
+
+                    enriched.push({
+                        id: "dummy_" + task.id,
+                        date: "", // No date since no work logged
+                        hours: 0,
+                        isBillable: true,
+                        nonBillableType: "",
+                        description: "",
+                        employeeId: task.resourceId,
+                        employeeName: res ? res.name : task.resourceId,
+                        wbsId: task.id,
+                        taskName: task.name,
+                        phaseName: task.phaseName,
+                        projectId: task.projectId,
+                        projectName: proj ? proj.name : task.projectId,
+                        status: task.status || "Not Started",
+                        reallocationStatusText: dummyReallocStr
+                    });
+                }
+            });
+
+            // Apply filters (using the flattened fields from the view)
+            if (filters.projectId) {
+                enriched = enriched.filter(ts => ts.projectId === filters.projectId);
+            }
+            if (filters.employeeId) {
+                enriched = enriched.filter(ts => ts.employeeId === filters.employeeId);
+            }
+            if (filters.status) {
+                enriched = enriched.filter(ts => ts.status === filters.status);
+            }
+
+            // Sort by date descending
+            enriched.sort((a, b) => {
+                // Keep the dummy rows (empty date) at the bottom or top depending, sort normal rows descending
+                if (!a.date) return 1;
+                if (!b.date) return -1;
+                return b.date.localeCompare(a.date);
+            });
+
+            oModel.setProperty("/timesheetsForDisplay", enriched);
+
+            // Compute KPIs (only summing actual numbers)
+            const totalHours = enriched.reduce((s, ts) => s + (parseFloat(ts.hours) || 0), 0);
+            const nonBillableHours = enriched.filter(ts => ts.id && !ts.id.startsWith("dummy_") && !ts.isBillable).reduce((s, ts) => s + (parseFloat(ts.hours) || 0), 0);
+            const billableHours = enriched.filter(ts => ts.id && !ts.id.startsWith("dummy_") && ts.isBillable).reduce((s, ts) => s + (parseFloat(ts.hours) || 0), 0);
+            const activeEntriesCount = enriched.filter(ts => ts.id && !ts.id.startsWith("dummy_")).length;
+
+            oModel.setProperty("/timesheetSummary", {
+                activeEntries: activeEntriesCount,
+                totalDisplayedEntries: enriched.length,
+                totalHours: Math.round(totalHours * 100) / 100,
+                billableHours: Math.round(billableHours * 100) / 100,
+                nonBillableHours: Math.round(nonBillableHours * 100) / 100
+            });
+        },
+
+        onTimesheetFilterChange: function () {
+            this._computeTimesheetData();
+        },
+
+        onClearTimesheetFilters: function () {
+            this.getView().getModel().setProperty("/timesheetFilters", { projectId: "", employeeId: "", status: "" });
+            this._computeTimesheetData();
+        },
+
+
+
+        onDeleteSingleWorkLog: function (oEvent) {
+            const oItem = oEvent.getSource().getBindingContext().getObject();
+            if (!oItem.id || oItem.id.startsWith("dummy_")) return;
+
+            sap.m.MessageBox.confirm("Are you sure you want to delete this log entry? This action cannot be undone.", {
+                title: "Delete Work Log",
+                onClose: async (sAction) => {
+                    if (sAction === sap.m.MessageBox.Action.OK) {
+                        try {
+                            const oODataModel = this._getODataModel();
+                            const oListBinding = oODataModel.bindList("/WorkLogs");
+                            const aContexts = await oListBinding.requestContexts(0, 5000);
+                            const oCtx = aContexts.find(c => {
+                                const obj = c.getObject();
+                                return obj && (obj.ID === oItem.id || obj.id === oItem.id);
+                            });
+
+                            if (oCtx && oCtx.delete) {
+                                oCtx.delete(BATCH_GROUP);
+                                await oODataModel.submitBatch(BATCH_GROUP);
+                                sap.m.MessageToast.show("Work log entry deleted permanently");
+                                await this._loadBackendData();
+                            }
+                        } catch (e) {
+                            console.error("Error deleting log", e);
+                            sap.m.MessageToast.show("Failed to delete log entry");
+                        }
+                    }
+                }
+            });
+        },
+
+        onDeleteAllWorkLogs: function () {
+            sap.m.MessageBox.warning("WARNING: You are about to permanently delete EVERY single work log in the database. Are you absolutely sure?", {
+                title: "Delete ALL Logs",
+                actions: [sap.m.MessageBox.Action.DELETE, sap.m.MessageBox.Action.CANCEL],
+                emphasizedAction: sap.m.MessageBox.Action.CANCEL,
+                onClose: async (sAction) => {
+                    if (sAction === sap.m.MessageBox.Action.DELETE) {
+                        try {
+                            const oODataModel = this._getODataModel();
+                            const oListBinding = oODataModel.bindList("/WorkLogs");
+                            const aContexts = await oListBinding.requestContexts(0, 5000);
+
+                            let count = 0;
+                            aContexts.forEach(c => {
+                                if (c && c.delete) {
+                                    c.delete(BATCH_GROUP);
+                                    count++;
+                                }
+                            });
+
+                            if (count > 0) {
+                                await oODataModel.submitBatch(BATCH_GROUP);
+                                sap.m.MessageToast.show(`Successfully deleted all ${count} log entries`);
+                                await this._loadBackendData();
+                            } else {
+                                sap.m.MessageToast.show("No entries to delete");
+                            }
+                        } catch (e) {
+                            console.error("Error deleting all logs", e);
+                            sap.m.MessageToast.show("Failed to wipe database entries");
+                        }
+                    }
+                }
+            });
+        },
+
+        // --- Tickets Allocation Logic ---
+        onOpenAddTicketDialog: function () {
+            const oModel = this.getView().getModel();
+            oModel.setProperty("/newTicket", { date: this._formatDateForOData(new Date()), module: "", ticketNo: "", description: "", resourceId: "", onBehalfOfId: "" });
+
+            if (!this._oAddTicketDialog) {
+                this.loadFragment({
+                    name: "projectmanagement.view.fragments.AddTicket"
+                }).then(function (oDialog) {
+                    this._oAddTicketDialog = oDialog;
+                    this.getView().addDependent(this._oAddTicketDialog);
+                    this._oAddTicketDialog.open();
+                }.bind(this));
+            } else {
+                this._oAddTicketDialog.open();
+            }
+        },
+
+        onCloseAddTicketDialog: function () {
+            if (this._oAddTicketDialog) {
+                this._oAddTicketDialog.close();
+            }
+        },
+
+        onSaveTicket: function () {
+            const oModel = this.getView().getModel();
+            const oNewTicket = Object.assign({}, oModel.getProperty("/newTicket"));
+
+            if (!oNewTicket.date || !oNewTicket.module || !oNewTicket.ticketNo || !oNewTicket.description || !oNewTicket.resourceId) {
+                MessageToast.show("Please fill all required fields");
+                return;
+            }
+
+            const aResources = oModel.getProperty("/resources") || [];
+            const res = aResources.find(r => r.id === oNewTicket.resourceId);
+            if (res) oNewTicket.resourceName = res.name;
+
+            if (oNewTicket.onBehalfOfId) {
+                const onBehalf = aResources.find(r => r.id === oNewTicket.onBehalfOfId);
+                if (onBehalf) oNewTicket.onBehalfOfName = onBehalf.name;
+            }
+
+            const aTickets = oModel.getProperty("/tickets") || [];
+            aTickets.unshift(oNewTicket); // Add to top
+            oModel.setProperty("/tickets", aTickets);
+
+            MessageToast.show("Ticket saved successfully");
+            this.onCloseAddTicketDialog();
+        },
+
+        onDeleteTicket: function (oEvent) {
+            const oItem = oEvent.getSource().getParent();
+            const iIndex = oItem.getBindingContext().getPath().split("/").pop();
+            const oModel = this.getView().getModel();
+            const aTickets = oModel.getProperty("/tickets");
+            aTickets.splice(iIndex, 1);
+            oModel.setProperty("/tickets", aTickets);
+        },
+
+        onImportTicketsCSV: function() {
+            this.byId("ticketsExcelFileUploader").clear();
+            // Programmatically trigger the hidden file uploader
+            this.byId("ticketsExcelFileUploader").$().find("input[type=file]").trigger("click");
+        },
+
+        onImportTicketsExcelFile: function(oEvent) {
+            const oFile = oEvent.getParameter("files") && oEvent.getParameter("files")[0];
+            if (!oFile) {
+                MessageToast.show("No file selected.");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const data = new Uint8Array(e.target.result);
+                try {
+                    // Check if XLSX is available
+                    if (typeof XLSX === "undefined") {
+                        sap.m.MessageBox.error("SheetJS (XLSX) library is not loaded. Please make sure it is included in your index.html.");
+                        return;
+                    }
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+                    if (json && json.length > 0) {
+                        this._processImportedTickets(json);
+                    } else {
+                        MessageToast.show("The file is empty or could not be parsed.");
+                    }
+                } catch (error) {
+                    sap.m.MessageBox.error("Error reading file. Ensure it's a valid Excel or CSV file.");
+                    console.error("Parse error:", error);
+                }
+            };
+            reader.readAsArrayBuffer(oFile);
+        },
+
+        _processImportedTickets: function(dataArray) {
+            const oModel = this.getView().getModel();
+            const aTickets = oModel.getProperty("/tickets") || [];
+            const aResources = oModel.getProperty("/resources") || [];
+            
+            let iCount = 0;
+
+            dataArray.forEach(row => {
+                // Try to find matching columns based on common names
+                const dateRaw = row["Date"] || row["date"] || "";
+                const module = row["Module"] || row["module"] || "";
+                const ticketNo = row["Ticket No"] || row["Ticket Ref"] || row["ticketNo"] || "";
+                const desc = row["Description"] || row["Ticket Description"] || row["description"] || "";
+                const resourceStr = row["Resource"] || row["Employee"] || row["resource"] || "";
+                const onBehalfStr = row["On Behalf Of"] || row["onBehalfOf"] || "";
+
+                if (ticketNo || desc) {
+                    const oTicket = {
+                        date: this._formatDateForOData(dateRaw) || this._formatDateForOData(new Date()),
+                        module: module,
+                        ticketNo: ticketNo,
+                        description: desc
+                    };
+
+                    // Try to match resources
+                    const resMatch = aResources.find(r => r.name && r.name.toLowerCase() === resourceStr.toLowerCase());
+                    if (resMatch) {
+                        oTicket.resourceId = resMatch.id;
+                        oTicket.resourceName = resMatch.name;
+                    }
+
+                    const behalfMatch = aResources.find(r => r.name && r.name.toLowerCase() === onBehalfStr.toLowerCase());
+                    if (behalfMatch) {
+                        oTicket.onBehalfOfId = behalfMatch.id;
+                        oTicket.onBehalfOfName = behalfMatch.name;
+                    }
+
+                    aTickets.unshift(oTicket);
+                    iCount++;
+                }
+            });
+
+            oModel.setProperty("/tickets", aTickets);
+            oModel.refresh(true);
+            MessageToast.show("Successfully imported " + iCount + " tickets.");
         },
 
         formatDecimal: function (value) {

@@ -1,23 +1,23 @@
 <core:FragmentDefinition xmlns="sap.m" xmlns:core="sap.ui.core" xmlns:layout="sap.ui.layout">
-    <Dialog id="CreateResourceDialog" title="{= ${/editingResourceId} ? 'Edit Resource' : 'Define New Resource' }" contentWidth="450px">
+    <Dialog id="CreateResourceDialog" title="{= ${/editingResourceId} ? 'Edit Resource' : 'Define New Resource' }" contentWidth="28rem">
         <content>
             <VBox class="sapUiSmallMargin">
                 
-                <HBox width="100%" class="sapUiSmallMarginBottom">
-                    <VBox width="50%" class="sapUiTinyMarginEnd">
+                <layout:Grid defaultSpan="L6 M6 S12" class="sapUiSmallMarginBottom">
+                    <VBox>
                         <Label text="Resource Name" required="true" class="customLabel"/>
                         <Input value="{/newResource/name}" placeholder="e.g. John Doe" class="customInput" />
                     </VBox>
-                    <VBox width="50%" class="sapUiTinyMarginBegin">
+                    <VBox>
                         <Label text="Resource Type" required="true" class="customLabel"/>
                         <Select selectedKey="{/newResource/type}" change="onResTypeChange" width="100%" class="customInput">
                             <core:Item key="Full Time" text="Full Time" />
                             <core:Item key="Contract" text="Contract" />
                         </Select>
                     </VBox>
-                </HBox>
+                </layout:Grid>
                 
-                <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiSmallMarginTop sapUiTinyMarginBottom">
+                <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiSmallMarginTop sapUiTinyMarginBottom" wrap="Wrap">
                     <Label text="Roles / Titles" required="true" class="customLabel"/>
                     <HBox alignItems="Center">
                         <Input value="{/newCustomRole}" placeholder="New Role..." width="6.5rem" class="customInput textXsInput sapUiTinyMarginEnd" />

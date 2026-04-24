@@ -78,12 +78,12 @@ modules:
         [
           {
             "name": "project-management-capm",
-            "url": "https://org-build-stefbuildjs-build-project-management-capm-srv.cfapps.us10-001.hana.ondemand.com",
+            "url": "https://d283a1e6trial-dev-project-management-capm-srv.cfapps.us10-001.hana.ondemand.com",
             "forwardAuthToken": false
           },
           {
             "name": "project-management-ui",
-            "url": "https://org-build-stefbuildjs-build-project-management-ui.cfapps.us10-001.hana.ondemand.com",
+            "url": "https://d283a1e6trial-dev-project-management-ui.cfapps.us10-001.hana.ondemand.com",
             "forwardAuthToken": false
           }
         ]

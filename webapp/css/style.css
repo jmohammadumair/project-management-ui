@@ -1135,6 +1135,19 @@
     background-color: rgba(59, 130, 246, 0.03) !important;
 }
 
+/* Resource view rows need dynamic height */
+.timelineTaskRow.resourceTimelineRow {
+    height: auto !important;
+    max-height: none !important;
+    min-height: 3.5rem;
+}
+
+.timelineTaskRow.resourceTimelineRow .timelineTaskLabelCol {
+    height: auto !important;
+    max-height: none !important;
+    min-height: 3.5rem;
+}
+
 /* Bar area (right part of each row, holds grid + gantt bar) */
 .timelineBarArea {
     position: relative !important;
@@ -1185,10 +1198,10 @@ span.ganttBarText {
 }
 
 .ganttResourceBarsWrapper {
-    position: absolute !important;
+    position: relative !important;
     width: 100% !important;
-    height: 100% !important;
     z-index: 10;
+    padding: 4px 0;
 }
 
 .ganttTaskBarWrapper {
@@ -1207,9 +1220,11 @@ span.ganttBarText {
 }
 
 .ganttResourceBarRow {
-    height: 32px;
+    height: 28px;
+    min-height: 28px;
     align-items: center !important;
     pointer-events: none !important;
+    margin-bottom: 2px;
 }
 
 .ganttBarSpacer {
