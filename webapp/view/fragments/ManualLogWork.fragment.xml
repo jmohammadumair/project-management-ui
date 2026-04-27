@@ -25,8 +25,8 @@
 
                 <VBox width="100%" class="sapUiSmallMarginBottom" visible="{= !!${/newManualWorkLog/projectId} &amp;&amp; ${/newManualWorkLog/isBillable}}">
                     <Label text="Ticket" class="customLabel" required="true" />
-                    <Select selectedKey="{/newManualWorkLog/taskId}" items="{path: '/manualTasks'}" forceSelection="false" width="100%" class="forceWhiteSelect">
-                        <core:Item key="{id}" text="{name} ({phaseName})" />
+                    <Select selectedKey="{/newManualWorkLog/taskId}" items="{/tickets}" forceSelection="false" width="100%" class="forceWhiteSelect">
+                        <core:Item key="{ID}" text="{ticketNo}" />
                     </Select>
                 </VBox>
 
