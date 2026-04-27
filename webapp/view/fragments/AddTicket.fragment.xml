@@ -18,6 +18,23 @@
                     </VBox>
                 </layout:Grid>
 
+                <layout:Grid defaultSpan="L6 M6 S12" class="sapUiSmallMarginBottom">
+                    <VBox>
+                        <Label text="Project Name" class="customLabel" required="true" />
+                        <Select selectedKey="{/newTicket/projectId}" items="{path: '/projects', templateShareable: true}" forceSelection="false" width="100%" class="forceWhiteSelect">
+                            <core:Item key="{id}" text="{name}" />
+                        </Select>
+                    </VBox>
+                    <VBox>
+                        <Label text="Priority" class="customLabel" required="true" />
+                        <Select selectedKey="{/newTicket/priority}" forceSelection="false" width="100%" class="forceWhiteSelect">
+                            <core:Item key="Low" text="Low" />
+                            <core:Item key="Medium" text="Medium" />
+                            <core:Item key="High" text="High" />
+                        </Select>
+                    </VBox>
+                </layout:Grid>
+
                 <VBox class="sapUiSmallMarginBottom" width="100%">
                     <Label text="Module" class="customLabel" required="true" />
                     <Select selectedKey="{/newTicket/module}" items="{path: '/availableRoles', templateShareable: true}" forceSelection="false" width="100%" class="forceWhiteSelect">
@@ -29,12 +46,6 @@
                     <VBox>
                         <Label text="Resource" class="customLabel" required="true" />
                         <Select selectedKey="{/newTicket/resourceId}" items="{path: '/resources', templateShareable: true}" forceSelection="false" width="100%" class="forceWhiteSelect">
-                            <core:Item key="{id}" text="{name}" />
-                        </Select>
-                    </VBox>
-                    <VBox>
-                        <Label text="On Behalf Of" class="customLabel" />
-                        <Select selectedKey="{/newTicket/onBehalfOfId}" items="{path: '/resources', templateShareable: true}" forceSelection="false" width="100%" class="forceWhiteSelect">
                             <core:Item key="{id}" text="{name}" />
                         </Select>
                     </VBox>

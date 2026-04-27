@@ -168,7 +168,8 @@ sap.ui.define([
                     aTemplateTasksRaw,
                     aWbsTasksRaw,
                     aWorkLogsRaw,
-                    aEDiaryViewRaw
+                    aEDiaryViewRaw,
+                    aTicketsRaw
                 ] = await Promise.all([
                     loadList("/Projects"),
                     loadList("/Resources"),
@@ -180,7 +181,8 @@ sap.ui.define([
                     loadList("/TemplateTasks"),
                     loadList("/WBSTasks"),
                     loadList("/WorkLogs"),
-                    loadList("/EDiaryView")
+                    loadList("/EDiaryView"),
+                    loadList("/Tickets").catch(() => [])
                 ]);
 
                 const mProjRolesByProject = {};
@@ -352,6 +354,27 @@ sap.ui.define([
                     projectName: ed.projectName
                 }));
 
+                // --- Map Tickets ---
+                const aTickets = aTicketsRaw.map(t => {
+                    const proj = aProjects.find(p => p.id === t.project_ID);
+                    const res = aResources.find(r => r.id === t.resource_ID);
+                    const onBehalf = aResources.find(r => r.id === t.onBehalfOf_ID);
+                    return {
+                        id: t.ID,
+                        projectId: t.project_ID || '',
+                        projectName: proj ? proj.name : '',
+                        date: t.date,
+                        module: t.module,
+                        ticketNo: t.ticketNo,
+                        description: t.description,
+                        priority: t.priority || 'Medium',
+                        resourceId: t.resource_ID || '',
+                        resourceName: res ? res.name : '',
+                        onBehalfOfId: t.onBehalfOf_ID || '',
+                        onBehalfOfName: onBehalf ? onBehalf.name : ''
+                    };
+                });
+
                 oViewModel.setProperty("/projects", aProjects);
                 oViewModel.setProperty("/resources", aResources);
                 oViewModel.setProperty("/allocations", aAllocations);
@@ -360,6 +383,7 @@ sap.ui.define([
                 oViewModel.setProperty("/wbsTasks", aWbsTasks);
                 oViewModel.setProperty("/workLogs", aWorkLogs);
                 oViewModel.setProperty("/eDiaryView", aEDiaryView);
+                oViewModel.setProperty("/tickets", aTickets);
 
                 this._calculateAnalytics();
                 this._computeWbsTasks();
@@ -3240,7 +3264,7 @@ sap.ui.define([
         // --- Tickets Allocation Logic ---
         onOpenAddTicketDialog: function () {
             const oModel = this.getView().getModel();
-            oModel.setProperty("/newTicket", { date: this._formatDateForOData(new Date()), module: "", ticketNo: "", description: "", resourceId: "", onBehalfOfId: "" });
+            oModel.setProperty("/newTicket", { date: this._formatDateForOData(new Date()), projectId: "", priority: "Medium", module: "", ticketNo: "", description: "", resourceId: "", onBehalfOfId: "" });
 
             if (!this._oAddTicketDialog) {
                 this.loadFragment({
@@ -3261,39 +3285,85 @@ sap.ui.define([
             }
         },
 
-        onSaveTicket: function () {
+        onSaveTicket: async function () {
             const oModel = this.getView().getModel();
             const oNewTicket = Object.assign({}, oModel.getProperty("/newTicket"));
 
-            if (!oNewTicket.date || !oNewTicket.module || !oNewTicket.ticketNo || !oNewTicket.description || !oNewTicket.resourceId) {
+            if (!oNewTicket.date || !oNewTicket.module || !oNewTicket.ticketNo || !oNewTicket.description || !oNewTicket.resourceId || !oNewTicket.projectId || !oNewTicket.priority) {
                 MessageToast.show("Please fill all required fields");
                 return;
             }
 
-            const aResources = oModel.getProperty("/resources") || [];
-            const res = aResources.find(r => r.id === oNewTicket.resourceId);
-            if (res) oNewTicket.resourceName = res.name;
+            try {
+                const oODataModel = this._getODataModel();
+                const oPayload = {
+                    project_ID: oNewTicket.projectId,
+                    date: oNewTicket.date,
+                    module: oNewTicket.module,
+                    ticketNo: oNewTicket.ticketNo,
+                    description: oNewTicket.description,
+                    priority: oNewTicket.priority,
+                    resource_ID: oNewTicket.resourceId
+                };
 
-            if (oNewTicket.onBehalfOfId) {
-                const onBehalf = aResources.find(r => r.id === oNewTicket.onBehalfOfId);
-                if (onBehalf) oNewTicket.onBehalfOfName = onBehalf.name;
+                this._createEntry(oODataModel, "/Tickets", oPayload);
+                await oODataModel.submitBatch(BATCH_GROUP);
+
+                MessageToast.show("Ticket saved successfully");
+                this.onCloseAddTicketDialog();
+                await this._loadBackendData();
+            } catch (e) {
+                console.error("Error saving ticket", e);
+                MessageToast.show("Failed to save ticket");
             }
-
-            const aTickets = oModel.getProperty("/tickets") || [];
-            aTickets.unshift(oNewTicket); // Add to top
-            oModel.setProperty("/tickets", aTickets);
-
-            MessageToast.show("Ticket saved successfully");
-            this.onCloseAddTicketDialog();
         },
 
-        onDeleteTicket: function (oEvent) {
-            const oItem = oEvent.getSource().getParent();
-            const iIndex = oItem.getBindingContext().getPath().split("/").pop();
+        onTicketOnBehalfOfChange: function(oEvent) {
+            const oComboBox = oEvent.getSource();
+            const sSelectedKey = oComboBox.getSelectedKey();
+            const oContext = oComboBox.getBindingContext();
+            const sPath = oContext.getPath();
+            
             const oModel = this.getView().getModel();
-            const aTickets = oModel.getProperty("/tickets");
-            aTickets.splice(iIndex, 1);
-            oModel.setProperty("/tickets", aTickets);
+            const aResources = oModel.getProperty("/resources") || [];
+            const res = aResources.find(r => r.id === sSelectedKey);
+            
+            if (res) {
+                oModel.setProperty(sPath + "/onBehalfOfName", res.name);
+            } else {
+                oModel.setProperty(sPath + "/onBehalfOfName", "");
+            }
+        },
+
+        onDeleteTicket: async function (oEvent) {
+            const oItem = oEvent.getSource().getParent();
+            const sPath = oItem.getBindingContext().getPath();
+            const oModel = this.getView().getModel();
+            const oTicket = oModel.getProperty(sPath);
+
+            if (!oTicket || !oTicket.id) {
+                // Fallback for local-only tickets (e.g. imported but not yet persisted)
+                const iIndex = sPath.split("/").pop();
+                const aTickets = oModel.getProperty("/tickets");
+                aTickets.splice(iIndex, 1);
+                oModel.setProperty("/tickets", [...aTickets]);
+                oModel.refresh(true);
+                return;
+            }
+
+            try {
+                const oODataModel = this._getODataModel();
+                const oBinding = oODataModel.bindContext("/Tickets(" + oTicket.id + ")");
+                await oBinding.requestObject();
+                const oContext = oBinding.getBoundContext();
+                oContext.delete(BATCH_GROUP);
+                await oODataModel.submitBatch(BATCH_GROUP);
+                MessageToast.show("Ticket deleted");
+                await this._loadBackendData();
+            } catch (e) {
+                console.error("Error deleting ticket", e);
+                MessageToast.show("Failed to delete ticket");
+            }
         },
 
         onImportTicketsCSV: function() {
