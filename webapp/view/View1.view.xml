@@ -165,7 +165,7 @@
                                 <columns>
                                     <Column><Text text="Name" class="colText"/></Column>
                                     <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Type" class="colText"/></Column>
-                                    <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Roles" class="colText"/></Column>
+                                    <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Modules" class="colText"/></Column>
                                     <Column hAlign="End" demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Cost Profile / Year" class="colText"/></Column>
                                     <Column hAlign="End" demandPopin="true" minScreenWidth="Phone" popinDisplay="Inline"><Text text="Rate" class="colText"/></Column>
                                     <Column hAlign="Center" width="4rem"></Column>

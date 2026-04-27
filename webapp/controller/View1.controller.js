@@ -2945,7 +2945,8 @@ sap.ui.define([
                 hours: "",
                 isBillable: true,
                 nonBillableType: "",
-                description: ""
+                description: "",
+                modules:""
             });
 
             // Make sure the dropdown for tasks is initially empty

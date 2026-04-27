@@ -4,7 +4,7 @@
     xmlns:f="sap.ui.layout.form"
     xmlns:layout="sap.ui.layout">
 
-    <Dialog id="ManualLogWorkDialog" title="Manual Work Entry" contentWidth="34rem" class="sapUiContentPadding">
+    <Dialog id="ManualLogWorkDialog" title="Manual Work Entry" contentWidth="34rem" height="auto" class="sapUiContentPadding">
         <content>
             <VBox class="sapUiSmallMargin">
 
@@ -16,11 +16,26 @@
                     </Select>
                 </VBox>
 
+               <VBox width="100%" class="sapUiSmallMarginBottom" visible="{= !!${/newManualWorkLog/projectId} &amp;&amp; ${/newManualWorkLog/isBillable}}">
+                    <Label text="Module Name" class="customLabel" required="true" />
+                    <Select selectedKey="{/newManualWorkLog/modules}" items="{/analytics/enrichedResources}" forceSelection="false" width="100%" class="forceWhiteSelect">
+                        <core:Item key="{ID}" text="{roles}" />
+                    </Select>
+                </VBox>
+
                 <VBox width="100%" class="sapUiSmallMarginBottom" visible="{= !!${/newManualWorkLog/projectId} &amp;&amp; ${/newManualWorkLog/isBillable}}">
-                    <Label text="Task" class="customLabel" required="true" />
+                    <Label text="Ticket" class="customLabel" required="true" />
                     <Select selectedKey="{/newManualWorkLog/taskId}" items="{path: '/manualTasks'}" forceSelection="false" width="100%" class="forceWhiteSelect">
                         <core:Item key="{id}" text="{name} ({phaseName})" />
                     </Select>
+                </VBox>
+
+                <VBox width="100%" class="sapUiSmallMarginBottom" visible="{= !!${/newManualWorkLog/projectId} &amp;&amp; ${/newManualWorkLog/isBillable}}">
+                    <Label text="Ticket Description" class="customLabel" required="true" />
+                     <TextArea value="{/newManualWorkLog/description}" rows="3" width="100%" placeholder="What did you accomplish?" />
+                    <!-- <Select selectedKey="{/newManualWorkLog/taskId}" items="{path: '/manualTasks'}" forceSelection="false" width="100%" class="forceWhiteSelect">
+                        <core:Item key="{id}" text="{name} ({phaseName})" />
+                    </Select> -->
                 </VBox>
 
                 <layout:Grid defaultSpan="L6 M6 S12" class="sapUiSmallMarginTop">
@@ -50,7 +65,7 @@
                     </Select>
                 </VBox>
 
-                <Label text="Description of Work" class="customLabel sapUiSmallMarginTop" required="true" />
+                <Label text="Notes" class="customLabel sapUiSmallMarginTop" required="true" />
                 <TextArea value="{/newManualWorkLog/description}" rows="3" width="100%" placeholder="What did you accomplish?" />
 
             </VBox>
