@@ -735,9 +735,11 @@
                                 <Table items="{/tickets}" class="customTable" mode="None">
                                     <columns>
                                         <Column width="7rem"><Text text="Date" class="colText"/></Column>
+                                        <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Project Name" class="colText"/></Column>
                                         <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Module" class="colText"/></Column>
                                         <Column><Text text="Ticket No / Ref" class="colText"/></Column>
                                         <Column demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Description" class="colText"/></Column>
+                                        <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Priority" class="colText"/></Column>
                                         <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Resource" class="colText"/></Column>
                                         <Column demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="On Behalf Of" class="colText"/></Column>
                                         <Column width="3rem" hAlign="Center"><Text text="" class="colText"/></Column>
@@ -746,11 +748,15 @@
                                         <ColumnListItem vAlign="Middle" class="hoverableRow">
                                             <cells>
                                                 <Text text="{path: 'date', formatter: '.formatDate'}" class="boldText" />
+                                                <Text text="{projectName}" class="boldText" />
                                                 <Text text="{module}" class="lightText" />
                                                 <Text text="{ticketNo}" class="boldText customBlueText" />
                                                 <Text text="{description}" class="lightText textXs" />
+                                                <ObjectStatus text="{priority}" state="{= ${priority} === 'High' ? 'Error' : (${priority} === 'Medium' ? 'Warning' : 'Success')}" class="customStatusPill" inverted="true" visible="{= !!${priority}}" />
                                                 <Text text="{resourceName}" class="lightText" />
-                                                <Text text="{onBehalfOfName}" class="lightText" />
+                                                <ComboBox selectedKey="{onBehalfOfId}" items="{path: '/resources', templateShareable: true}" change="onTicketOnBehalfOfChange" placeholder="Select..." width="10rem" class="customInput">
+                                                    <core:Item key="{id}" text="{name}" />
+                                                </ComboBox>
                                                 <Button icon="sap-icon://delete" type="Transparent" press="onDeleteTicket" tooltip="Delete Ticket" class="actionDelete" />
                                             </cells>
                                         </ColumnListItem>
