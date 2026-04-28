@@ -354,6 +354,28 @@ sap.ui.define([
                     projectName: ed.projectName
                 }));
 
+                // Debug: E-Diary fetch/mapping check for Reporting Data table
+                console.groupCollapsed("[E-Diary] Fetch + Map Check");
+                console.log("Raw /EDiaryView count:", aEDiaryViewRaw.length);
+                console.log("Mapped eDiaryView count:", aEDiaryView.length);
+                console.table(
+                    aEDiaryView.slice(0, 10).map(function (r) {
+                        return {
+                            id: r.id,
+                            date: r.date,
+                            employeeName: r.employeeName,
+                            projectName: r.projectName,
+                            taskName: r.taskName,
+                            description: r.description,
+                            hours: r.hours,
+                            status: r.status,
+                            isBillable: r.isBillable,
+                            nonBillableType: r.nonBillableType
+                        };
+                    })
+                );
+                console.groupEnd();
+
                 // --- Map Tickets ---
                 const aTickets = aTicketsRaw.map(t => {
                     const proj = aProjects.find(p => p.id === t.project_ID);
@@ -3167,6 +3189,31 @@ sap.ui.define([
             });
 
             oModel.setProperty("/timesheetsForDisplay", enriched);
+
+            // Debug: Reporting Data table columns/data check
+            console.groupCollapsed("[Reporting Data] Table Data Check");
+            console.log("Filters:", filters);
+            console.log("Input eDiaryView rows:", eDiaryData.length);
+            console.log("Output timesheetsForDisplay rows:", enriched.length);
+            console.table(
+                enriched.slice(0, 15).map(function (row) {
+                    return {
+                        Date: row.date || "",
+                        Employee: row.employeeName || "",
+                        Project: row.projectName || "NA",
+                        "Ticket No": row.ticketNo || "",
+                        "Ticket Description": row.description || "",
+                        Task: row.taskName || "NA",
+                        Reallocation: row.reallocationStatusText || "",
+                        Status: row.status || "",
+                        Hours: row.hours || 0,
+                        Billable: row.isBillable ? "Yes" : "No",
+                        "NB Category": row.nonBillableType || "",
+                        Notes: row.description || ""
+                    };
+                })
+            );
+            console.groupEnd();
 
             // Compute KPIs (only summing actual numbers)
             const totalHours = enriched.reduce((s, ts) => s + (parseFloat(ts.hours) || 0), 0);

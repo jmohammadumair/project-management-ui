@@ -670,33 +670,41 @@
                                             <Text text="Read-only view" class="lightText textXs" />
                                         </Toolbar>
                                     </headerToolbar>
-                                    <Table items="{/timesheetsForDisplay}" class="customTable" mode="None">
+                                    <Table items="{/timesheetsForDisplay}" class="customTable reportingTable" mode="None">
                                         <columns>
-                                            <Column width="7rem"><Text text="Date" class="colText"/></Column>
-                                            <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Employee" class="colText"/></Column>
-                                            <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Project" class="colText"/></Column>
-                                            <Column><Text text="Task" class="colText"/></Column>
-                                            <Column demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Reallocation" class="colText"/></Column>
-                                            <Column hAlign="Center" width="8rem" demandPopin="true" minScreenWidth="Phone" popinDisplay="Inline"><Text text="Status" class="colText"/></Column>
-                                            <Column hAlign="Center" width="5rem" demandPopin="true" minScreenWidth="Phone" popinDisplay="Inline"><Text text="Hours" class="colText"/></Column>
-                                            <Column hAlign="Center" width="6rem" demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Billable?" class="colText"/></Column>
-                                            <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="NB Category" class="colText"/></Column>
-                                            <Column demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Description" class="colText"/></Column>
+                                            <Column width="7rem" hAlign="Center"><Text text="Date" class="colText" wrapping="false" textAlign="Center"/></Column>
+                                            <Column hAlign="Begin" demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Employee" class="colText" wrapping="false" textAlign="Center"/></Column>
+                                            <Column hAlign="Begin" demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Project" class="colText" wrapping="false" textAlign="Center"/></Column>
+                                            <Column hAlign="Center" demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Ticket No" class="colText" wrapping="false" textAlign="Center"/></Column>
+                                            <Column hAlign="Begin" demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Ticket Description" class="colText" wrapping="false" textAlign="Center"/></Column>
+                                            <Column hAlign="Begin"><Text text="Task" class="colText" wrapping="false" textAlign="Center"/></Column>
+                                            <Column hAlign="Center" demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Reallocation" class="colText" wrapping="false" textAlign="Center"/></Column>
+                                            <Column hAlign="Center" width="8rem" demandPopin="true" minScreenWidth="Phone" popinDisplay="Inline"><Text text="Status" class="colText" wrapping="false" textAlign="Center"/></Column>
+                                            <Column hAlign="Center" width="5rem" demandPopin="true" minScreenWidth="Phone" popinDisplay="Inline"><Text text="Hours" class="colText" wrapping="false" textAlign="Center"/></Column>
+                                            <Column hAlign="Center" width="6rem" demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Billable?" class="colText" wrapping="false" textAlign="Center"/></Column>
+                                            <Column hAlign="Center" demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="NB Category" class="colText" wrapping="false" textAlign="Center"/></Column>
+                                            <Column hAlign="Begin" demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Notes" class="colText" wrapping="false" textAlign="Center"/></Column>
                                             <Column width="3rem" hAlign="Center"><Text text="" class="colText"/></Column>
                                         </columns>
                                         <items>
                                             <ColumnListItem vAlign="Middle" class="{= ${isBillable} ? 'hoverableRow' : 'hoverableRow nonBillableRow'}">
                                                 <cells>
-                                                    <Text text="{path: 'date', formatter: '.formatDate'}" class="boldText" />
+                                                    <Text text="{path: 'date', formatter: '.formatDate'}" class="boldText" textAlign="Center" width="100%" />
                                                     <Text text="{employeeName}" class="lightText" />
                                                     <Text text="{= ${projectName} || 'NA'}" class="boldText" />
+                                                    <Text text="{ticketNo}" class="lightText" textAlign="Center" width="100%" />
+                                                    <Text text="{description}" class="lightText" />
                                                     <Text text="{taskName}" class="lightText" />
-                                                    <Text text="{reallocationStatusText}" class="lightText textXs" visible="{= !!${reallocationStatusText}}" />
-                                                    <ObjectStatus text="{status}" state="{= ${status} === 'Completed' ? 'Success' : (${status} === 'Working' ? 'Warning' : (${status} === 'Paused' ? 'Information' : 'None'))}" inverted="true" class="customStatusPill" />
-                                                    <Text text="{hours}" class="boldText customBlueText" />
+                                                    <Text text="{reallocationStatusText}" class="lightText textXs" textAlign="Center" width="100%" visible="{= !!${reallocationStatusText}}" />
+                                                    <HBox justifyContent="Center">
+                                                        <ObjectStatus text="{status}" state="{= ${status} === 'Completed' ? 'Success' : (${status} === 'Working' ? 'Warning' : (${status} === 'Paused' ? 'Information' : 'None'))}" inverted="true" class="customStatusPill" />
+                                                    </HBox>
+                                                    <Text text="{hours}" class="boldText customBlueText" textAlign="Center" width="100%" />
                                                     <!-- Billable Flag -->
-                                                    <core:Icon src="{= ${isBillable} ? 'sap-icon://accept' : 'sap-icon://decline'}" color="{= ${isBillable} ? '#10b981' : '#f59e0b'}" size="1.1rem" />
-                                                    <Text text="{= ${isBillable} ? '—' : ${nonBillableType}}" class="lightText textXs" />
+                                                    <HBox justifyContent="Center">
+                                                        <core:Icon src="{= ${isBillable} ? 'sap-icon://accept' : 'sap-icon://decline'}" color="{= ${isBillable} ? '#10b981' : '#f59e0b'}" size="1.1rem" />
+                                                    </HBox>
+                                                    <Text text="{= ${isBillable} ? '—' : ${nonBillableType}}" class="lightText textXs" textAlign="Center" width="100%" />
                                                     <Text text="{description}" class="lightText textXs" />
                                                     <Button icon="sap-icon://delete" type="Transparent" press="onDeleteSingleWorkLog" tooltip="Delete this log" visible="false" />
                                                 </cells>

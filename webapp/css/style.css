@@ -645,6 +645,54 @@
     font-size: 0.8125rem !important;
 }
 
+/* Reporting table: wrap only at whole-word boundaries (no mid-word breaks) */
+.reportingTable .sapMListTblCell .sapMText {
+    white-space: normal !important;
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
+    hyphens: none !important;
+    font-size: 0.74rem !important;
+    line-height: 1.25 !important;
+    text-overflow: clip !important;
+    overflow: visible !important;
+}
+
+/* Slightly smaller text for long content cells to preserve complete words */
+.reportingTable .reportingWordWrap {
+    font-size: 0.75rem !important;
+    line-height: 1.25 !important;
+}
+
+.reportingTable .sapMListTblHeaderCell .sapMText {
+    white-space: normal !important;
+    word-break: keep-all !important;
+    overflow-wrap: normal !important;
+    hyphens: none !important;
+    font-size: 0.72rem !important;
+    line-height: 1.2 !important;
+}
+
+.reportingTable .ticketDescHeader .ticketDescHeaderText {
+    font-size: 0.72rem !important;
+    line-height: 1.1 !important;
+    white-space: nowrap !important;
+}
+
+.reportingTable .reallocationHeader {
+    font-size: 0.72rem !important;
+    white-space: nowrap !important;
+    word-break: keep-all !important;
+}
+
+.reportingTable .reportingFullText {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
+    hyphens: none !important;
+}
+
 /* Tablet & Mobile adjustments (below 1024px) */
 @media screen and (max-width: 1024px) {
     .customContentArea {
