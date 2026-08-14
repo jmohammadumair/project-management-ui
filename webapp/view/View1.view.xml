@@ -91,14 +91,14 @@
                                                 <columns>
                                                     <Column><Text text="Name" class="colText"/></Column>
                                                     <Column><Text text="Type" class="colText"/></Column>
-                                                    <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Roles" class="colText"/></Column>
+                                                    <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Modules" class="colText"/></Column>
                                                     <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Assigned Projects" class="colText"/></Column>
                                                     <Column hAlign="End" demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Allocated Time" class="colText"/></Column>
                                                 </columns>
                                                 <items>
                                                     <ColumnListItem vAlign="Middle">
                                                         <cells>
-                                                            <VBox><Text text="{name}" class="boldText" /><Text text="{id}" class="lightText"/></VBox>
+                                                            <Text text="{name} ({id})" class="boldText" />
                                                             <ObjectStatus text="{type}" state="{= ${type} === 'Contract' ? 'Warning' : 'Success'}" inverted="true" class="customStatusPill" />
                                                             <HBox items="{roles}" wrap="Wrap">
                                                                 <Text text="{}" class="rolePill sapUiTinyMarginEnd" />
@@ -205,7 +205,7 @@
                                     <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Project ID" class="colText"/></Column>
                                     <Column><Text text="Project Name" class="colText"/></Column>
                                     <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Timeline" class="colText"/></Column>
-                                    <Column demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Req. Roles" class="colText"/></Column>
+                                    <Column demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Req. Modules" class="colText"/></Column>
                                     <Column demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Allocated Resources" class="colText"/></Column>
                                     <!-- <Column demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Template" class="colText"/></Column> -->
                                     <Column hAlign="End" demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Actual Costs" class="colText"/></Column>
@@ -499,6 +499,64 @@
                                 </HBox>
                             </VBox>
 
+                            <!-- Common Action Bar -->
+                            <HBox visible="{= !!${/employeeSelectedResourceId}}" justifyContent="End" class="sapUiSmallMarginBottom">
+                                <Button text="Manual Log Work" icon="sap-icon://add-document" press="onOpenManualLogWork" type="Emphasized" />
+                            </HBox>
+
+                            <!-- Employee Tickets -->
+                            <VBox visible="{= !!${/employeeSelectedResourceId} &amp;&amp; ${/employeeTickets}.length > 0 }" class="customPanel sapUiSmallMarginBottom" style="overflow-x: auto;">
+                                <Panel backgroundDesign="Solid" class="customPanel">
+                                    <headerToolbar>
+                                        <Toolbar height="3rem" style="Clear">
+                                            <core:Icon src="sap-icon://sys-monitor" class="sapUiTinyMarginEnd lightText"/>
+                                            <Title text="Assigned Tickets" class="tableTitle"/>
+                                            <ToolbarSpacer />
+                                            <Text text="{/employeeTickets/length} ticket(s)" class="lightText textXs" />
+                                        </Toolbar>
+                                    </headerToolbar>
+                                    <Table items="{/employeeTickets}" class="customTable" mode="None">
+                                        <columns>
+                                            <Column><Text text="Ticket" class="colText"/></Column>
+                                            <Column demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Module" class="colText"/></Column>
+                                            <Column demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Description" class="colText"/></Column>
+                                            <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline" hAlign="Center"><Text text="Priority" class="colText"/></Column>
+                                            <Column demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Assignment" class="colText"/></Column>
+                                            <Column hAlign="Center" width="5rem" demandPopin="true" minScreenWidth="Phone" popinDisplay="Inline"><Text text="Planned" class="colText"/></Column>
+                                            <Column hAlign="Center" width="7rem" demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Time Worked" class="colText"/></Column>
+                                            <Column hAlign="Center" demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Status" class="colText"/></Column>
+                                            <Column hAlign="Center" width="12rem" demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Actions" class="colText"/></Column>
+                                        </columns>
+                                        <items>
+                                            <ColumnListItem vAlign="Middle" class="hoverableRow">
+                                                <cells>
+                                                    <VBox>
+                                                        <Text text="{ticketNo}" class="boldText customBlueText" />
+                                                        <Text text="{projectName}" class="textXs lightText" />
+                                                    </VBox>
+                                                    <Text text="{module}" class="lightText" />
+                                                    <Text text="{description}" class="lightText textXs" />
+                                                    <ObjectStatus text="{priority}" state="{= ${priority} === 'High' ? 'Error' : (${priority} === 'Medium' ? 'Warning' : 'Success')}" class="customStatusPill" inverted="true" />
+                                                    <Text text="{assignmentText}" visible="{= !!${assignmentText}}" class="{= ${isLoggingDisabled} ? 'textRed textXs' : 'customBlueText textXs'}" />
+                                                    <Text text="{hours} hrs" class="boldText" />
+                                                    <VBox alignItems="Center">
+                                                        <Text text="{elapsedDisplay}" class="{= ${isOvertime} ? 'boldText textRed' : 'boldText customBlueText'}" />
+                                                        <Text text="{= ${isOvertime} ? 'Overtime' : ''}" visible="{isOvertime}" class="textXs textRed" />
+                                                    </VBox>
+                                                    <ObjectStatus text="{status}" state="{= ${status} === 'Completed' ? 'Success' : (${status} === 'Working' ? 'Warning' : (${status} === 'Paused' ? 'Information' : 'None'))}" inverted="true" class="customStatusPill" />
+                                                    <HBox justifyContent="Center" alignItems="Center">
+                                                        <Button icon="sap-icon://edit" tooltip="Update Progress" press="onTicketEditDialog" type="Transparent" class="sapUiTinyMarginEnd" />
+                                                        <Button icon="sap-icon://begin" tooltip="Start" press="onTicketStart" type="Accept" enabled="{= !${isLoggingDisabled} &amp;&amp; ${status} !== 'Working' &amp;&amp; ${status} !== 'Completed'}" class="sapUiTinyMarginEnd" />
+                                                        <Button icon="sap-icon://pause" tooltip="Pause" press="onTicketPause" type="Attention" enabled="{= !${isLoggingDisabled} &amp;&amp; ${status} === 'Working'}" class="sapUiTinyMarginEnd" />
+                                                        <Button icon="sap-icon://stop" tooltip="Complete" press="onTicketStop" type="Reject" enabled="{= !${isLoggingDisabled} &amp;&amp; ${status} !== 'Completed' &amp;&amp; ${status} !== 'Not Started'}" />
+                                                    </HBox>
+                                                </cells>
+                                            </ColumnListItem>
+                                        </items>
+                                    </Table>
+                                </Panel>
+                            </VBox>
+
                             <!-- Employee Tasks Table (planning data only) -->
                             <VBox visible="{= !!${/employeeSelectedResourceId} &amp;&amp; ${/employeeTasks}.length > 0 }" class="customPanel" style="overflow-x: auto;">
                                 <Panel backgroundDesign="Solid" class="customPanel">
@@ -507,7 +565,6 @@
                                             <core:Icon src="sap-icon://task" class="sapUiTinyMarginEnd lightText"/>
                                             <Title text="Assigned Tasks" class="tableTitle"/>
                                             <ToolbarSpacer />
-                                            <Button text="Manual Log Work" icon="sap-icon://add-document" press="onOpenManualLogWork" type="Emphasized" />
                                         </Toolbar>
                                     </headerToolbar>
                                     <Table items="{/employeeTasks}" class="customTable" mode="None">
@@ -693,7 +750,7 @@
                                                     <Text text="{employeeName}" class="lightText" />
                                                     <Text text="{= ${projectName} || 'NA'}" class="boldText" />
                                                     <Text text="{ticketNo}" class="lightText" textAlign="Center" width="100%" />
-                                                    <Text text="{description}" class="lightText" />
+                                                    <ExpandableText text="{ticketDescription}" overflowMode="InPlace" maxCharacters="50" class="lightText reportingFullText" />
                                                     <Text text="{taskName}" class="lightText" />
                                                     <Text text="{reallocationStatusText}" class="lightText textXs" textAlign="Center" width="100%" visible="{= !!${reallocationStatusText}}" />
                                                     <HBox justifyContent="Center">
@@ -705,7 +762,7 @@
                                                         <core:Icon src="{= ${isBillable} ? 'sap-icon://accept' : 'sap-icon://decline'}" color="{= ${isBillable} ? '#10b981' : '#f59e0b'}" size="1.1rem" />
                                                     </HBox>
                                                     <Text text="{= ${isBillable} ? '—' : ${nonBillableType}}" class="lightText textXs" textAlign="Center" width="100%" />
-                                                    <Text text="{description}" class="lightText textXs" />
+                                                    <ExpandableText text="{description}" overflowMode="InPlace" maxCharacters="50" class="lightText textXs reportingFullText" />
                                                     <Button icon="sap-icon://delete" type="Transparent" press="onDeleteSingleWorkLog" tooltip="Delete this log" visible="false" />
                                                 </cells>
                                             </ColumnListItem>
@@ -748,9 +805,9 @@
                                         <Column><Text text="Ticket No / Ref" class="colText"/></Column>
                                         <Column demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Description" class="colText"/></Column>
                                         <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Priority" class="colText"/></Column>
-                                        <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Resource" class="colText"/></Column>
-                                        <Column demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="On Behalf Of" class="colText"/></Column>
-                                        <Column width="3rem" hAlign="Center"><Text text="" class="colText"/></Column>
+                                        <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Assign" class="colText"/></Column>
+                                        <Column demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Re-Assign" class="colText"/></Column>
+                                        <Column width="5rem" hAlign="Center"><Text text="" class="colText"/></Column>
                                     </columns>
                                     <items>
                                         <ColumnListItem vAlign="Middle" class="hoverableRow">
@@ -765,7 +822,10 @@
                                                 <ComboBox selectedKey="{onBehalfOfId}" items="{path: '/resources', templateShareable: true}" change="onTicketOnBehalfOfChange" placeholder="Select..." width="10rem" class="customInput">
                                                     <core:Item key="{id}" text="{name}" />
                                                 </ComboBox>
-                                                <Button icon="sap-icon://delete" type="Transparent" press="onDeleteTicket" tooltip="Delete Ticket" class="actionDelete" />
+                                                <HBox justifyContent="Center" width="100%">
+                                                    <Button icon="sap-icon://edit" type="Transparent" press="onEditTicket" tooltip="Edit Ticket" class="actionEdit sapUiTinyMarginEnd" />
+                                                    <Button icon="sap-icon://delete" type="Transparent" press="onDeleteTicket" tooltip="Delete Ticket" class="actionDelete" />
+                                                </HBox>
                                             </cells>
                                         </ColumnListItem>
                                     </items>

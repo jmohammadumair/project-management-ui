@@ -1,0 +1,90 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:layout="sap.ui.layout">
+
+    <Dialog id="EditTicketDialog" title="Edit Ticket" contentWidth="34rem" class="sapUiContentPadding" stretch="{device>/system/phone}">
+        <content>
+            <VBox class="sapUiSmallMargin">
+
+                <layout:Grid defaultSpan="L6 M6 S12" class="sapUiSmallMarginBottom">
+                    <VBox>
+                        <Label text="Date" class="customLabel" required="true" />
+                        <DatePicker value="{/editTicket/date}" valueFormat="yyyy-MM-dd" displayFormat="dd/MM/yyyy" width="100%" class="customInput" />
+                    </VBox>
+                    <VBox>
+                        <Label text="Ticket No / Ref" class="customLabel" required="true" />
+                        <Input value="{/editTicket/ticketNo}" placeholder="e.g. INC12345" width="100%" class="customInput" />
+                    </VBox>
+                </layout:Grid>
+
+                <layout:Grid defaultSpan="L6 M6 S12" class="sapUiSmallMarginBottom">
+                    <VBox>
+                        <Label text="Project Name" class="customLabel" required="true" />
+                        <Select selectedKey="{/editTicket/projectId}" change="onEditTicketProjectChange" items="{path: '/projects', templateShareable: true}" forceSelection="false" width="100%" class="forceWhiteSelect">
+                            <core:Item key="{id}" text="{name}" />
+                        </Select>
+                    </VBox>
+                    <VBox>
+                        <Label text="Status" class="customLabel" required="true" />
+                        <Select selectedKey="{/editTicket/status}" forceSelection="false" width="100%" class="forceWhiteSelect">
+                            <core:Item key="Not Started" text="Not Started" />
+                            <core:Item key="Working" text="Working" />
+                            <core:Item key="Paused" text="Paused" />
+                            <core:Item key="Completed" text="Completed" />
+                        </Select>
+                    </VBox>
+                </layout:Grid>
+
+                <layout:Grid defaultSpan="L6 M6 S12" class="sapUiSmallMarginBottom">
+                    <VBox visible="{= !!${/editTicket/projectId} }">
+                        <Label text="Module" class="customLabel" required="true" />
+                        <Select selectedKey="{/editTicket/module}" items="{path: '/ticketModulesForSelectedProject', templateShareable: true}" forceSelection="false" width="100%" class="forceWhiteSelect">
+                            <core:Item key="{}" text="{}" />
+                        </Select>
+                    </VBox>
+                    <VBox>
+                        <Label text="Priority" class="customLabel" required="true" />
+                        <Select selectedKey="{/editTicket/priority}" forceSelection="false" width="100%" class="forceWhiteSelect">
+                            <core:Item key="Low" text="Low" />
+                            <core:Item key="Medium" text="Medium" />
+                            <core:Item key="High" text="High" />
+                        </Select>
+                    </VBox>
+                </layout:Grid>
+
+                <layout:Grid defaultSpan="L6 M6 S12" class="sapUiSmallMarginBottom">
+                    <VBox>
+                        <Label text="Assign" class="customLabel" required="true" />
+                        <Select selectedKey="{/editTicket/resourceId}" items="{path: '/resources', templateShareable: true}" forceSelection="false" width="100%" class="forceWhiteSelect">
+                            <core:Item key="{id}" text="{name}" />
+                        </Select>
+                    </VBox>
+                    <VBox>
+                        <Label text="Re-Assign" class="customLabel" />
+                        <Select selectedKey="{/editTicket/onBehalfOfId}" items="{path: '/resources', templateShareable: true}" forceSelection="false" width="100%" class="forceWhiteSelect">
+                            <core:Item key="{id}" text="{name}" />
+                        </Select>
+                    </VBox>
+                </layout:Grid>
+
+                <VBox class="sapUiSmallMarginBottom" width="100%">
+                    <Label text="Planned Hours" class="customLabel" />
+                    <Input value="{/editTicket/hours}" type="Number" placeholder="e.g. 8" width="100%" class="customInput" />
+                </VBox>
+
+                <Label text="Ticket Description" class="customLabel" required="true" />
+                <TextArea value="{/editTicket/description}" rows="3" width="100%" placeholder="Describe the ticket..." class="customInput" />
+
+            </VBox>
+        </content>
+        <footer>
+            <Toolbar>
+                <ToolbarSpacer />
+                <Button text="Save Changes" press="onSaveEditTicket" class="customPrimaryBtn" />
+                <Button text="Cancel" press="onCloseEditTicketDialog" class="customCancelBtn" />
+            </Toolbar>
+        </footer>
+    </Dialog>
+
+</core:FragmentDefinition>

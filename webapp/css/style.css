@@ -98,6 +98,7 @@
 
 .tableWrapper {
     padding: 1rem;
+    overflow-x: auto;
 }
 
 .tableHeaderBar {
@@ -163,6 +164,7 @@
     border-radius: 4px;
     padding: 0.15rem 0.5rem;
     font-weight: bold !important;
+    white-space: nowrap !important;
 }
 
 /* --- KPI Cards --- */

@@ -3,7 +3,7 @@
     xmlns:core="sap.ui.core"
     xmlns:layout="sap.ui.layout">
 
-    <Dialog id="AddTicketDialog" title="Add Ticket" contentWidth="34rem" class="sapUiContentPadding">
+    <Dialog id="AddTicketDialog" title="Add Ticket" contentWidth="34rem" class="sapUiContentPadding" stretch="{device>/system/phone}">
         <content>
             <VBox class="sapUiSmallMargin">
 
@@ -21,7 +21,7 @@
                 <layout:Grid defaultSpan="L6 M6 S12" class="sapUiSmallMarginBottom">
                     <VBox>
                         <Label text="Project Name" class="customLabel" required="true" />
-                        <Select selectedKey="{/newTicket/projectId}" items="{path: '/projects', templateShareable: true}" forceSelection="false" width="100%" class="forceWhiteSelect">
+                        <Select selectedKey="{/newTicket/projectId}" change="onTicketAddProjectChange" items="{path: '/projects', templateShareable: true}" forceSelection="false" width="100%" class="forceWhiteSelect">
                             <core:Item key="{id}" text="{name}" />
                         </Select>
                     </VBox>
@@ -35,21 +35,32 @@
                     </VBox>
                 </layout:Grid>
 
-                <VBox class="sapUiSmallMarginBottom" width="100%">
+                <VBox class="sapUiSmallMarginBottom" width="100%" visible="{= !!${/newTicket/projectId} }">
                     <Label text="Module" class="customLabel" required="true" />
-                    <Select selectedKey="{/newTicket/module}" items="{path: '/availableRoles', templateShareable: true}" forceSelection="false" width="100%" class="forceWhiteSelect">
+                    <Select selectedKey="{/newTicket/module}" items="{path: '/ticketModulesForSelectedProject', templateShareable: true}" forceSelection="false" width="100%" class="forceWhiteSelect">
                         <core:Item key="{}" text="{}" />
                     </Select>
                 </VBox>
 
                 <layout:Grid defaultSpan="L6 M6 S12" class="sapUiSmallMarginBottom">
                     <VBox>
-                        <Label text="Resource" class="customLabel" required="true" />
+                        <Label text="Assign" class="customLabel" required="true" />
                         <Select selectedKey="{/newTicket/resourceId}" items="{path: '/resources', templateShareable: true}" forceSelection="false" width="100%" class="forceWhiteSelect">
                             <core:Item key="{id}" text="{name}" />
                         </Select>
                     </VBox>
+                    <VBox>
+                        <Label text="Re-Assign" class="customLabel" />
+                        <Select selectedKey="{/newTicket/onBehalfOfId}" items="{path: '/resources', templateShareable: true}" forceSelection="false" width="100%" class="forceWhiteSelect">
+                            <core:Item key="{id}" text="{name}" />
+                        </Select>
+                    </VBox>
                 </layout:Grid>
+
+                <VBox class="sapUiSmallMarginBottom" width="100%">
+                    <Label text="Planned Hours" class="customLabel" />
+                    <Input value="{/newTicket/hours}" type="Number" placeholder="e.g. 8" width="100%" class="customInput" />
+                </VBox>
 
                 <Label text="Ticket Description" class="customLabel" required="true" />
                 <TextArea value="{/newTicket/description}" rows="3" width="100%" placeholder="Describe the ticket..." class="customInput" />

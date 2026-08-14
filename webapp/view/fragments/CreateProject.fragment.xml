@@ -1,5 +1,5 @@
 <core:FragmentDefinition xmlns="sap.m" xmlns:core="sap.ui.core" xmlns:layout="sap.ui.layout">
-    <Dialog id="CreateProjectDialog" title="{= ${/editingProjectId} ? 'Edit Project' : 'Define New Project' }" contentWidth="30rem">
+    <Dialog id="CreateProjectDialog" title="{= ${/editingProjectId} ? 'Edit Project' : 'Define New Project' }" contentWidth="30rem" stretch="{device>/system/phone}">
         <content>
             <ScrollContainer height="100%" vertical="true" horizontal="false">
                 <VBox class="sapUiSmallMargin">
@@ -27,11 +27,11 @@
 
 
                 <HBox justifyContent="SpaceBetween" alignItems="Center">
-                    <Label text="Required Resources" class="customLabel"/>
+                    <Label text="Required Modules" class="customLabel"/>
                     <Button text="+ Add Req" press="onAddRoleToProject" class="lightBlueBtn" />
                 </HBox>
 
-                <Text text="No specific resource roles defined." visible="{= ${/newProject/requiredRoles}.length === 0 }" class="lightText italicText sapUiSmallMarginTop" />
+                <Text text="No specific modules defined." visible="{= ${/newProject/requiredRoles}.length === 0 }" class="lightText italicText sapUiSmallMarginTop" />
 
                 <VBox items="{/newProject/requiredRoles}" class="sapUiTinyMarginTop">
                     <HBox alignItems="Center" class="sapUiTinyMarginBottom" width="100%">
@@ -42,7 +42,7 @@
                             <core:Item key="{}" text="{}" />
                         </Select>
                         <Input value="{count}" type="Number" placeholder="Qty" class="customInput sapUiTinyMarginEnd" width="4rem" />
-                        <Button icon="sap-icon://delete" press="onDeleteRoleFromProject" type="Transparent" class="actionDelete" tooltip="Remove role" />
+                        <Button icon="sap-icon://delete" press="onDeleteRoleFromProject" type="Transparent" class="actionDelete" tooltip="Remove module" />
                     </HBox>
                 </VBox>
 

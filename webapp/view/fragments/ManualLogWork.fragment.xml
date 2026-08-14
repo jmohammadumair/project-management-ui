@@ -4,7 +4,7 @@
     xmlns:f="sap.ui.layout.form"
     xmlns:layout="sap.ui.layout">
 
-    <Dialog id="ManualLogWorkDialog" title="Manual Work Entry" contentWidth="34rem" height="auto" class="sapUiContentPadding">
+    <Dialog id="ManualLogWorkDialog" title="Manual Work Entry" contentWidth="34rem" height="auto" class="sapUiContentPadding" stretch="{device>/system/phone}">
         <content>
             <VBox class="sapUiSmallMargin">
 
@@ -18,24 +18,21 @@
 
                <VBox width="100%" class="sapUiSmallMarginBottom" visible="{= !!${/newManualWorkLog/projectId} &amp;&amp; ${/newManualWorkLog/isBillable}}">
                     <Label text="Module Name" class="customLabel" required="true" />
-                    <Select selectedKey="{/newManualWorkLog/modules}" items="{/analytics/enrichedResources}" forceSelection="false" width="100%" class="forceWhiteSelect">
-                        <core:Item key="{ID}" text="{roles}" />
+                    <Select selectedKey="{/newManualWorkLog/module}" items="{/manualModules}" forceSelection="false" change="onManualModuleChange" width="100%" class="forceWhiteSelect">
+                        <core:Item key="{module}" text="{module}" />
                     </Select>
                 </VBox>
 
                 <VBox width="100%" class="sapUiSmallMarginBottom" visible="{= !!${/newManualWorkLog/projectId} &amp;&amp; ${/newManualWorkLog/isBillable}}">
                     <Label text="Ticket" class="customLabel" required="true" />
-                    <Select selectedKey="{/newManualWorkLog/taskId}" items="{/tickets}" forceSelection="false" width="100%" class="forceWhiteSelect">
-                        <core:Item key="{ID}" text="{ticketNo}" />
+                    <Select selectedKey="{/newManualWorkLog/ticketId}" items="{/manualTickets}" forceSelection="false" change="onTicketChange" width="100%" class="forceWhiteSelect">
+                        <core:Item key="{id}" text="{ticketNo}" />
                     </Select>
                 </VBox>
 
                 <VBox width="100%" class="sapUiSmallMarginBottom" visible="{= !!${/newManualWorkLog/projectId} &amp;&amp; ${/newManualWorkLog/isBillable}}">
-                    <Label text="Ticket Description" class="customLabel" required="true" />
-                     <TextArea value="{/newManualWorkLog/description}" rows="3" width="100%" placeholder="What did you accomplish?" />
-                    <!-- <Select selectedKey="{/newManualWorkLog/taskId}" items="{path: '/manualTasks'}" forceSelection="false" width="100%" class="forceWhiteSelect">
-                        <core:Item key="{id}" text="{name} ({phaseName})" />
-                    </Select> -->
+                    <Label text="Ticket Description" class="customLabel" required="false" />
+                     <TextArea value="{/newManualWorkLog/ticketDescription}" rows="3" width="100%" placeholder="Ticket description" editable="false" />
                 </VBox>
 
                 <layout:Grid defaultSpan="L6 M6 S12" class="sapUiSmallMarginTop">

@@ -1,5 +1,5 @@
 <core:FragmentDefinition xmlns="sap.m" xmlns:core="sap.ui.core" xmlns:layout="sap.ui.layout">
-    <Dialog id="CreateAllocationDialog" title="Allocate Resource to Project" contentWidth="35rem">
+    <Dialog id="CreateAllocationDialog" title="Allocate Resource to Project" contentWidth="35rem" stretch="{device>/system/phone}">
         <content>
             <VBox class="sapUiSmallMargin">
                 <Label text="Select Project" required="true" class="customLabel sapUiTinyMarginBottom"/>

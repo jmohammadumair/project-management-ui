@@ -4,7 +4,7 @@
     xmlns:f="sap.ui.layout.form"
     xmlns:layout="sap.ui.layout">
 
-    <Dialog id="LogWorkDialog" title="Log Work for: {/newWorkLog/taskName}" contentWidth="34rem" class="sapUiContentPadding">
+    <Dialog id="LogWorkDialog" title="Log Work for: {/newWorkLog/taskName}" contentWidth="34rem" class="sapUiContentPadding" stretch="{device>/system/phone}">
         <content>
             <VBox class="sapUiSmallMargin">
 
@@ -19,6 +19,11 @@
                         <Text text="{/newWorkLog/employeeName}" class="boldText" />
                     </VBox>
                 </layout:Grid>
+
+                <VBox visible="{= !!${/newWorkLog/ticketDescription}}" class="sapUiSmallMarginBottom">
+                    <Label text="Ticket Description" class="customLabel" />
+                    <Text text="{/newWorkLog/ticketDescription}" class="lightText textXs" wrapping="true" />
+                </VBox>
 
                 <layout:Grid defaultSpan="L6 M6 S12" class="sapUiSmallMarginTop">
                     <VBox>

@@ -3,11 +3,16 @@
     xmlns:core="sap.ui.core"
     xmlns:f="sap.ui.layout.form">
 
-    <Dialog id="EditEmployeeTaskDialog" title="Log Work for Task" contentWidth="25rem" class="sapUiContentPadding">
+    <Dialog id="EditEmployeeTaskDialog" title="{= ${/editingEmployeeTask/isTicket} ? 'Log Work for Ticket' : 'Log Work for Task' }" contentWidth="25rem" class="sapUiContentPadding" stretch="{device>/system/phone}">
         <content>
             <VBox class="sapUiSmallMargin">
-                <Label text="Task Name" class="customLabel" />
+                <Label text="{= ${/editingEmployeeTask/isTicket} ? 'Ticket No' : 'Task Name' }" class="customLabel" />
                 <Text text="{/editingEmployeeTask/name}" class="sapUiSmallMarginBottom boldText" />
+
+                <VBox visible="{= !!${/editingEmployeeTask/ticketDescription}}" class="sapUiSmallMarginBottom">
+                    <Label text="Ticket Description" class="customLabel" />
+                    <Text text="{/editingEmployeeTask/ticketDescription}" class="lightText textXs" wrapping="true" />
+                </VBox>
 
                 <Label text="Hours Worked" class="customLabel" required="true" />
                 <Input value="{/editingEmployeeTask/logHours}" type="Number" placeholder="e.g. 4" class="customInput sapUiSmallMarginBottom" />

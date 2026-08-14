@@ -1,5 +1,5 @@
 <core:FragmentDefinition xmlns="sap.m" xmlns:core="sap.ui.core" xmlns:layout="sap.ui.layout">
-    <Dialog id="CreateResourceDialog" title="{= ${/editingResourceId} ? 'Edit Resource' : 'Define New Resource' }" contentWidth="28rem">
+    <Dialog id="CreateResourceDialog" title="{= ${/editingResourceId} ? 'Edit Resource' : 'Define New Resource' }" contentWidth="28rem" stretch="{device>/system/phone}">
         <content>
             <VBox class="sapUiSmallMargin">
                 
