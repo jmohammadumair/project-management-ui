@@ -176,7 +176,7 @@ sap.ui.define([
 
                 timesheets: [], // actually EDiaryView now
                 timesheetsForDisplay: [],
-                timesheetFilters: { projectId: "", employeeId: "", taskId: "" },
+                timesheetFilters: { projectId: "", employeeId: "", status: "" },
                 timesheetSummary: { totalEntries: 0, totalHours: 0, billableHours: 0, nonBillableHours: 0 },
                 newWorkLog: {}
             };
@@ -221,7 +221,7 @@ sap.ui.define([
                     loadList("/TemplateTasks"),
                     loadList("/WBSTasks"),
                     loadList("/WorkLogs"),
-                    loadList("/EDiaryView"),
+                    loadList("/EDiaryView").catch(() => []),
                     loadList("/Tickets").catch(() => [])
                 ]);
 
@@ -474,8 +474,8 @@ sap.ui.define([
 
         getWorkingHours: function (startStr, endStr) {
             if (!startStr || !endStr) return 0;
-            const s = new Date(startStr);
-            const e = new Date(endStr);
+            const s = new Date(startStr + 'T00:00:00');
+            const e = new Date(endStr + 'T00:00:00');
             if (isNaN(s.getTime()) || isNaN(e.getTime()) || e < s) return 0;
             let count = 0;
             const cur = new Date(s);
@@ -1270,6 +1270,21 @@ sap.ui.define([
                 }
                 await oODataModel.submitBatch(BATCH_GROUP);
 
+                // Remove the deleted project's persisted template association/task map so a
+                // future project reusing this ID doesn't inherit stale template state
+                try {
+                    const mProjectTemplateMap = JSON.parse(localStorage.getItem("projectTemplateMap") || "{}");
+                    if (sId in mProjectTemplateMap) {
+                        delete mProjectTemplateMap[sId];
+                        localStorage.setItem("projectTemplateMap", JSON.stringify(mProjectTemplateMap));
+                    }
+                    const mProjectTemplateTasks = JSON.parse(localStorage.getItem("projectTemplateTasks") || "{}");
+                    if (sId in mProjectTemplateTasks) {
+                        delete mProjectTemplateTasks[sId];
+                        localStorage.setItem("projectTemplateTasks", JSON.stringify(mProjectTemplateTasks));
+                    }
+                } catch (ignore) { }
+
                 // Clear UI state if the deleted project was active in WBS or Timeline
                 const oModel = this.getView().getModel();
                 if (oModel.getProperty("/wbsSelectedProjectId") === sId) {
@@ -1304,9 +1319,19 @@ sap.ui.define([
 
         onAddResource: function () {
             const oModel = this.getView().getModel();
-            const count = oModel.getProperty("/resources").length;
+            const aResources = oModel.getProperty("/resources") || [];
+            let maxId = 0;
+            aResources.forEach(r => {
+                const sId = (r.id || r.ID || "").toString();
+                const numStr = sId.replace(/\D/g, "");
+                if (numStr) {
+                    const num = parseInt(numStr, 10);
+                    if (num > maxId) maxId = num;
+                }
+            });
+            const newId = `R${String(maxId + 1).padStart(3, '0')}`;
             oModel.setProperty("/editingResourceId", null);
-            oModel.setProperty("/newResource", { id: `R00${count + 1}`, name: "", type: "Full Time", roles: [], salary: null, officeCost: null, overheadCost: null, hourlyRate: 0 });
+            oModel.setProperty("/newResource", { id: newId, name: "", type: "Full Time", roles: [], salary: null, officeCost: null, overheadCost: null, hourlyRate: 0 });
             this._openDialog("CreateResource");
         },
 
@@ -2669,7 +2694,11 @@ sap.ui.define([
 
         formatDate: function (dateStr) {
             if (!dateStr) return "";
-            const oDate = new Date(dateStr);
+            const sNormalized = (typeof dateStr === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateStr))
+                ? dateStr + "T00:00:00"
+                : dateStr;
+            const oDate = new Date(sNormalized);
+            if (isNaN(oDate.getTime())) return "";
             return DateFormat.getDateInstance({ style: "medium" }).format(oDate);
         },
         onEmployeeResourceChange: function () {
@@ -3168,7 +3197,10 @@ sap.ui.define([
 
             // Also filter tickets by project and resource to find distinct modules
             const allTickets = oModel.getProperty("/tickets") || [];
-            const empTickets = allTickets.filter(t => t.projectId === sProjectId && t.resourceId === resourceId);
+            const empTickets = allTickets.filter(t =>
+                t.projectId === sProjectId &&
+                (t.onBehalfOfId === resourceId || (t.resourceId === resourceId && !t.onBehalfOfId))
+            );
 
             // Extract unique modules
             const uniqueModules = [...new Set(empTickets.map(t => t.module).filter(Boolean))].map(m => ({ module: m }));
@@ -3260,9 +3292,6 @@ sap.ui.define([
                         this._saveTimeTrackingData(timeData);
                     }
                 }
-
-                this.byId("ManualLogWorkDialog").close();
-                sap.m.MessageToast.show("Manual work entry logged successfully");
 
                 this.byId("ManualLogWorkDialog").close();
                 sap.m.MessageToast.show("Manual work entry logged successfully");
@@ -3425,6 +3454,9 @@ sap.ui.define([
             }
             if (filters.employeeId) {
                 enriched = enriched.filter(ts => ts.employeeId === filters.employeeId);
+            }
+            if (filters.status) {
+                enriched = enriched.filter(ts => ts.status === filters.status);
             }
 
             // Sort by date descending
@@ -3606,19 +3638,19 @@ sap.ui.define([
             oModel.setProperty("/editTicket", {
                 id: oTicket.id || oTicket.ID,
                 date: oTicket.date,
-                projectId: oTicket.project_ID,
+                projectId: oTicket.projectId,
                 module: oTicket.module,
                 ticketNo: oTicket.ticketNo,
                 description: oTicket.description,
-                resourceId: oTicket.resource_ID,
-                onBehalfOfId: oTicket.onBehalfOf_ID,
+                resourceId: oTicket.resourceId,
+                onBehalfOfId: oTicket.onBehalfOfId,
                 hours: oTicket.hours,
                 priority: oTicket.priority,
                 status: oTicket.status
             });
 
             const projects = oModel.getProperty("/projects") || [];
-            const project = projects.find(p => p.id === oTicket.project_ID);
+            const project = projects.find(p => p.id === oTicket.projectId);
             if (project && project.requiredRoles) {
                 oModel.setProperty("/ticketModulesForSelectedProject", project.requiredRoles.map(r => r.role));
             } else {
@@ -3738,7 +3770,7 @@ sap.ui.define([
             }
         },
 
-        onTicketOnBehalfOfChange: function (oEvent) {
+        onTicketOnBehalfOfChange: async function (oEvent) {
             const oComboBox = oEvent.getSource();
             const sSelectedKey = oComboBox.getSelectedKey();
             const oContext = oComboBox.getBindingContext();
@@ -3759,10 +3791,9 @@ sap.ui.define([
             const oODataModel = this._getODataModel();
             try {
                 const oBoundCtx = oODataModel.bindContext("/Tickets(" + sTicketId + ")").getBoundContext();
-                if (oBoundCtx) {
-                    oBoundCtx.setProperty("onBehalfOf_ID", sSelectedKey || null);
-                    sap.m.MessageToast.show("Ticket re-assignment saved.");
-                }
+                oBoundCtx.setProperty("onBehalfOf_ID", sSelectedKey || null);
+                await oODataModel.submitBatch(BATCH_GROUP);
+                sap.m.MessageToast.show("Ticket re-assignment saved.");
             } catch (e) {
                 console.error("Error saving ticket reassignment:", e);
                 sap.m.MessageToast.show("Error saving reassignment.");
