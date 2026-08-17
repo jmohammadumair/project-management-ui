@@ -78,7 +78,7 @@ modules:
         [
           {
             "name": "project-management-capm",
-            "url": "https://d283a1e6trial-dev-project-management-capm-srv.cfapps.us10-001.hana.ondemand.com",
+            "url": "https://ed5141e1trial-dev-project-management-capm-srv.cfapps.us10-001.hana.ondemand.com",
             "forwardAuthToken": false
           },
           {

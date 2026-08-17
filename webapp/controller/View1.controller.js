@@ -2537,7 +2537,7 @@ sap.ui.define([
                 .filter(t => Number.isFinite(t._startTs) && Number.isFinite(t._endTs) && t._endTs >= t._startTs);
 
             if (tasks.length === 0) {
-                oModel.setProperty("/timelineData", { proj: proj, tasks: [], weeks: [] });
+                oModel.setProperty("/timelineData", { proj: proj, tasks: [], rows: [], weeks: [] });
                 oModel.setProperty("/timelineResourceData", []);
                 return;
             }
@@ -2599,6 +2599,37 @@ sap.ui.define([
                 });
             });
 
+            // Order tasks by their WBS sequence so phases group together predictably
+            enrichedTasks.sort(function (a, b) { return (a.sequence || 0) - (b.sequence || 0); });
+
+            // Group tasks into phase-header + task rows for the Task Level Timeline
+            var timelineRows = [];
+            var phaseGroups = new Map();
+            enrichedTasks.forEach(function (t) {
+                var sPhase = t.phaseName || 'Unassigned Phase';
+                if (!phaseGroups.has(sPhase)) {
+                    phaseGroups.set(sPhase, { phaseName: sPhase, tasks: [], totalHours: 0, minLeftPx: Infinity, maxRightPx: -Infinity });
+                }
+                var g = phaseGroups.get(sPhase);
+                g.tasks.push(t);
+                g.totalHours += (t.hours || 0);
+                g.minLeftPx = Math.min(g.minLeftPx, t.leftPx);
+                g.maxRightPx = Math.max(g.maxRightPx, t.leftPx + t.widthPx);
+            });
+            phaseGroups.forEach(function (g) {
+                timelineRows.push({
+                    rowType: 'phase',
+                    phaseName: g.phaseName,
+                    taskCount: g.tasks.length,
+                    totalHours: g.totalHours,
+                    leftPx: g.minLeftPx,
+                    widthPx: Math.max(cellWidthPx, g.maxRightPx - g.minLeftPx)
+                });
+                g.tasks.forEach(function (t) {
+                    timelineRows.push(Object.assign({ rowType: 'task' }, t));
+                });
+            });
+
             const weeks = [];
             const dayLetters = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
             // Use UTC to avoid DST shifts creating duplicate/missing days
@@ -2648,7 +2679,7 @@ sap.ui.define([
                 weeks.push({ label: "Week 1", days: [], daysCount: 1 });
             }
             var gridMinWidth = totalCells * 28;
-            oModel.setProperty("/timelineData", { proj: proj, tasks: enrichedTasks, weeks: weeks, totalDayCells: totalCells, gridMinWidth: gridMinWidth + 'px' });
+            oModel.setProperty("/timelineData", { proj: proj, tasks: enrichedTasks, rows: timelineRows, weeks: weeks, totalDayCells: totalCells, gridMinWidth: gridMinWidth + 'px' });
 
             // Compute Resource timeline data
             const map = new Map();

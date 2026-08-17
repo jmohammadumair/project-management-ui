@@ -1293,7 +1293,6 @@ span.ganttBarText {
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
     height: 1.75rem !important;
     border-radius: 6px !important;
-    margin-top: 1rem !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: center !important;
@@ -1302,6 +1301,33 @@ span.ganttBarText {
     box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3) !important;
     box-sizing: border-box !important;
     cursor: help;
+    z-index: 10;
+}
+
+/* Phase group header row (Task Level Timeline) */
+.timelinePhaseRow {
+    background-color: #f3f4f6 !important;
+}
+
+.timelinePhaseLabelCol {
+    padding: 0.5rem 0.75rem;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center;
+    border-left: 3px solid #6b7280;
+    height: 3.5rem;
+    min-height: 3.5rem;
+    max-height: 3.5rem;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.ganttBarPhase {
+    background: repeating-linear-gradient(135deg, #9ca3af 0, #9ca3af 6px, #d1d5db 6px, #d1d5db 12px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    height: 0.75rem !important;
+    border-radius: 4px !important;
+    box-sizing: border-box !important;
     z-index: 10;
 }
 

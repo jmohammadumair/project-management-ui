@@ -386,13 +386,14 @@
                                 <VBox class="timelineBody">
                                     
                                     <!-- Tasks View -->
-                                    <VBox items="{/timelineData/tasks}" visible="{= ${/timelineActiveSection} === 'tasks' }">
-                                        <HBox class="timelineTaskRow">
-                                            <VBox class="timelineLabelCol timelineTaskLabelCol">
-                                                <Text text="{name}" class="boldText" style="font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" tooltip="{name}" />
-                                                <Text text="{resourceName} ({hours}h)" class="lightText textXs" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;" tooltip="{resourceName}" />
+                                    <VBox items="{/timelineData/rows}" visible="{= ${/timelineActiveSection} === 'tasks' }">
+                                        <!-- Phase header row -->
+                                        <HBox class="timelineTaskRow timelinePhaseRow" visible="{= ${rowType} === 'phase' }">
+                                            <VBox class="timelineLabelCol timelinePhaseLabelCol">
+                                                <Text text="{phaseName}" class="boldText" style="font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" tooltip="{phaseName}" />
+                                                <Text text="{taskCount} tasks · {totalHours}h" class="lightText textXs" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;" />
                                             </VBox>
-                                            
+
                                             <HBox class="timelineGridArea timelineBarArea" style="min-width: {/timelineData/gridMinWidth}">
                                                 <HBox class="timelineGridOverlay" items="{/timelineData/weeks}">
                                                     <HBox class="timelineWeekGridCol" items="{days}">
@@ -402,7 +403,32 @@
                                                         <VBox class="{= ${isWeekend} ? 'timelineDayGridCell timelineDayGridWeekend' : 'timelineDayGridCell'}"></VBox>
                                                     </HBox>
                                                 </HBox>
-                                                
+
+                                                <!-- Phase span bar -->
+                                                <HBox class="ganttTaskBarWrapper">
+                                                    <VBox class="ganttBarSpacer" width="{leftPx}px"></VBox>
+                                                    <VBox class="ganttBarPhase" width="{widthPx}px" tooltip="{phaseName}: {taskCount} tasks, {totalHours}h"></VBox>
+                                                </HBox>
+                                            </HBox>
+                                        </HBox>
+
+                                        <!-- Task row -->
+                                        <HBox class="timelineTaskRow" visible="{= ${rowType} === 'task' }">
+                                            <VBox class="timelineLabelCol timelineTaskLabelCol">
+                                                <Text text="{name}" class="boldText" style="font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" tooltip="{name}" />
+                                                <Text text="{resourceName} ({hours}h)" class="lightText textXs" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;" tooltip="{resourceName}" />
+                                            </VBox>
+
+                                            <HBox class="timelineGridArea timelineBarArea" style="min-width: {/timelineData/gridMinWidth}">
+                                                <HBox class="timelineGridOverlay" items="{/timelineData/weeks}">
+                                                    <HBox class="timelineWeekGridCol" items="{days}">
+                                                        <layoutData>
+                                                            <FlexItemData growFactor="{daysCount}" shrinkFactor="0" baseSize="0%" />
+                                                        </layoutData>
+                                                        <VBox class="{= ${isWeekend} ? 'timelineDayGridCell timelineDayGridWeekend' : 'timelineDayGridCell'}"></VBox>
+                                                    </HBox>
+                                                </HBox>
+
                                                 <!-- Bar -->
                                                 <HBox class="ganttTaskBarWrapper">
                                                     <VBox class="ganttBarSpacer" width="{leftPx}px"></VBox>
