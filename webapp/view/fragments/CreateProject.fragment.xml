@@ -1,4 +1,4 @@
-<core:FragmentDefinition xmlns="sap.m" xmlns:core="sap.ui.core" xmlns:layout="sap.ui.layout">
+<core:FragmentDefinition xmlns="sap.m" xmlns:core="sap.ui.core" xmlns:layout="sap.ui.layout" xmlns:u="sap.ui.unified">
     <Dialog id="CreateProjectDialog" title="{= ${/editingProjectId} ? 'Edit Project' : 'Define New Project' }" contentWidth="30rem" stretch="{device>/system/phone}">
         <content>
             <ScrollContainer height="100%" vertical="true" horizontal="false">
@@ -43,6 +43,50 @@
                         </Select>
                         <Input value="{count}" type="Number" placeholder="Qty" class="customInput sapUiTinyMarginEnd" width="4rem" />
                         <Button icon="sap-icon://delete" press="onDeleteRoleFromProject" type="Transparent" class="actionDelete" tooltip="Remove module" />
+                    </HBox>
+                </VBox>
+
+                <u:FileUploader id="ticketTemplateFileUploader" visible="false" fileType="xlsx,xls,csv" change="onImportTicketTemplateExcelFile" />
+
+                <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiSmallMarginTop">
+                    <Label text="Ticket Template" class="customLabel"/>
+                    <HBox visible="{= !${/uiState/creatingNewTicketTemplate} }">
+                        <Button text="Upload" press="onImportTicketTemplateCSV" type="Transparent" class="sapUiTinyMarginEnd" />
+                        <Button text="+ New Template" press="onAddNewTicketTemplate" class="lightBlueBtn" />
+                    </HBox>
+                </HBox>
+
+                <Select selectedKey="{/newProject/ticketTemplateId}" items="{path: '/ticketTemplates'}" forceSelection="false" width="100%" class="forceWhiteSelect sapUiTinyMarginTop" visible="{= !${/uiState/creatingNewTicketTemplate} }">
+                    <core:Item key="{id}" text="{name}" />
+                </Select>
+                <Text text="No ticket template assigned — any module text will be accepted on this project's tickets." visible="{= !${/newProject/ticketTemplateId} &amp;&amp; !${/uiState/creatingNewTicketTemplate} }" class="lightText italicText textXs sapUiTinyMarginTop" />
+
+                <VBox visible="{= !!${/uiState/creatingNewTicketTemplate} }" class="sapUiTinyMarginTop" style="border: 1px solid #e5e7eb; border-radius: 4px; padding: 0.5rem;">
+                    <Input value="{/uiState/newTicketTemplateName}" placeholder="New template name..." class="customInput sapUiTinyMarginBottom" />
+
+                    <VBox items="{/uiState/newTicketTemplateItems}">
+                        <HBox alignItems="Center" class="sapUiTinyMarginBottom" width="100%">
+                            <Input value="{module}" placeholder="Module" class="customInput sapUiTinyMarginEnd" width="100%">
+                                <layoutData>
+                                    <FlexItemData growFactor="1" />
+                                </layoutData>
+                            </Input>
+                            <Select selectedKey="{defaultPriority}" width="7rem" class="customInput sapUiTinyMarginEnd forceWhiteSelect">
+                                <core:Item key="Low" text="Low" />
+                                <core:Item key="Medium" text="Medium" />
+                                <core:Item key="High" text="High" />
+                            </Select>
+                            <Input value="{defaultHours}" type="Number" placeholder="Hrs" class="customInput sapUiTinyMarginEnd" width="4rem" />
+                            <Button icon="sap-icon://delete" press="onRemoveTicketTemplateItem" type="Transparent" class="actionDelete" tooltip="Remove item" />
+                        </HBox>
+                    </VBox>
+
+                    <HBox justifyContent="SpaceBetween" class="sapUiTinyMarginTop">
+                        <HBox>
+                            <Button text="Upload More" press="onImportTicketTemplateCSV" type="Transparent" class="sapUiTinyMarginEnd" />
+                            <Button text="+ Add Item" press="onAddTicketTemplateItem" type="Transparent" />
+                        </HBox>
+                        <Button text="Cancel" press="onCancelNewTicketTemplate" type="Transparent" class="customCancelBtn" />
                     </HBox>
                 </VBox>
 

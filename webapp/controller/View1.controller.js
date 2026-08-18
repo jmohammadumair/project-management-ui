@@ -145,6 +145,8 @@ sap.ui.define([
                 filters: { projectId: "", resourceId: "" },
 
                 tickets: [],
+                ticketsForSelectedProject: [],
+                ticketsSelectedProjectId: "",
                 newTicket: { date: "", module: "", ticketNo: "", description: "", resourceId: "", onBehalfOfId: "", hours: "" },
 
                 analytics: {
@@ -155,10 +157,14 @@ sap.ui.define([
                     showNewTemplate: false,
                     newTemplateName: "New Custom Template",
                     editingTemplatePath: null,
-                    editingTemplateId: null
+                    editingTemplateId: null,
+                    creatingNewTicketTemplate: false,
+                    newTicketTemplateName: "",
+                    newTicketTemplateItems: []
                 },
 
                 templates: [],
+                ticketTemplates: [],
 
                 wbsTasks: [],
                 wbsTasksForSelectedProject: [],
@@ -209,7 +215,9 @@ sap.ui.define([
                     aWbsTasksRaw,
                     aWorkLogsRaw,
                     aEDiaryViewRaw,
-                    aTicketsRaw
+                    aTicketsRaw,
+                    aTicketTemplatesRaw,
+                    aTicketTemplateItemsRaw
                 ] = await Promise.all([
                     loadList("/Projects"),
                     loadList("/Resources"),
@@ -222,7 +230,9 @@ sap.ui.define([
                     loadList("/WBSTasks"),
                     loadList("/WorkLogs"),
                     loadList("/EDiaryView").catch(() => []),
-                    loadList("/Tickets").catch(() => [])
+                    loadList("/Tickets").catch(() => []),
+                    loadList("/TicketTemplates").catch(() => []),
+                    loadList("/TicketTemplateItems").catch(() => [])
                 ]);
 
                 const mProjRolesByProject = {};
@@ -266,6 +276,7 @@ sap.ui.define([
                         startDate: p.startDate,
                         endDate: p.endDate,
                         templateId: mProjectTemplateMap[p.ID] || "",
+                        ticketTemplateId: p.ticketTemplate_ID || "",
                         requiredRoles: mProjRolesByProject[p.ID] || []
                     };
                 });
@@ -343,6 +354,31 @@ sap.ui.define([
                         id: t.ID,
                         name: t.name,
                         phases: phases
+                    };
+                });
+
+                // --- Assemble Ticket Templates with nested items ---
+                const mItemsByTicketTemplate = {};
+                aTicketTemplateItemsRaw.forEach((it) => {
+                    const sTplId = it.template_ID;
+                    if (!sTplId) return;
+                    if (!mItemsByTicketTemplate[sTplId]) mItemsByTicketTemplate[sTplId] = [];
+                    mItemsByTicketTemplate[sTplId].push({
+                        id: it.ID,
+                        module: it.module,
+                        defaultPriority: it.defaultPriority || 'Medium',
+                        defaultHours: it.defaultHours,
+                        descriptionTemplate: it.descriptionTemplate,
+                        sequence: it.sequence
+                    });
+                });
+
+                const aTicketTemplates = aTicketTemplatesRaw.map((t) => {
+                    const items = (mItemsByTicketTemplate[t.ID] || []).sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+                    return {
+                        id: t.ID,
+                        name: t.name,
+                        items: items
                     };
                 });
 
@@ -457,11 +493,13 @@ sap.ui.define([
                 oViewModel.setProperty("/workLogs", aWorkLogs);
                 oViewModel.setProperty("/eDiaryView", aEDiaryView);
                 oViewModel.setProperty("/tickets", aTickets);
+                oViewModel.setProperty("/ticketTemplates", aTicketTemplates);
 
                 this._calculateAnalytics();
                 this._computeWbsTasks();
                 this._computeTimelineData();
                 this._computeTimesheetData(); // This will just format and filter EDiaryView
+                this._computeTicketsForSelectedProject();
                 if (this.getView().getModel().getProperty("/employeeSelectedResourceId")) {
                     this._computeEmployeeTasks();
                 }
@@ -531,8 +569,8 @@ sap.ui.define([
                     }
                 });
 
-                // Calculate allocated hours from the Work Breakdown Structure
-                const allocatedPlanHours = data.wbsTasks
+                // Calculate allocated hours from Tickets
+                const allocatedPlanHours = (data.tickets || [])
                     .filter(t => t.projectId === p.id)
                     .reduce((sum, t) => sum + (t.hours || 0), 0);
 
@@ -569,8 +607,8 @@ sap.ui.define([
                     if (totalHours > MAX_HOURS) ab.percentage = ((ab.hours / totalHours) * 100) + "%";
                 });
 
-                // Calculate total task hours from WBS tasks assigned to this resource
-                const totalTaskHours = (data.wbsTasks || [])
+                // Calculate total ticket hours assigned to this resource
+                const totalTaskHours = (data.tickets || [])
                     .filter(t => t.resourceId === r.id)
                     .reduce((sum, t) => sum + (t.hours || 0), 0);
                 const extraTaskHours = Math.max(0, totalTaskHours - totalHours);
@@ -653,7 +691,8 @@ sap.ui.define([
             });
             const newId = `P${String(maxId + 1).padStart(3, '0')}`;
             oModel.setProperty("/editingProjectId", null);
-            oModel.setProperty("/newProject", { id: newId, name: "", budget: null, startDate: "", endDate: "", requiredRoles: [], templateId: "" });
+            oModel.setProperty("/newProject", { id: newId, name: "", budget: null, startDate: "", endDate: "", requiredRoles: [], templateId: "", ticketTemplateId: "" });
+            this._resetTicketTemplateDraft();
             this._openDialog("CreateProject");
         },
 
@@ -672,7 +711,126 @@ sap.ui.define([
             oModel.setProperty("/editingOriginalTemplateId", itemCopy.templateId || "");
             oModel.setProperty("/editingProjectId", itemCopy.id);
             oModel.setProperty("/newProject", itemCopy);
+            this._resetTicketTemplateDraft();
             this._openDialog("CreateProject");
+        },
+
+        // --- Ticket Template Logic (managed inline from the Create/Edit Project dialog) ---
+        _generateUuid: function () {
+            if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+                const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        },
+
+        _resetTicketTemplateDraft: function () {
+            const oModel = this.getView().getModel();
+            oModel.setProperty("/uiState/creatingNewTicketTemplate", false);
+            oModel.setProperty("/uiState/newTicketTemplateName", "");
+            oModel.setProperty("/uiState/newTicketTemplateItems", []);
+        },
+
+        onAddNewTicketTemplate: function () {
+            const oModel = this.getView().getModel();
+            oModel.setProperty("/uiState/creatingNewTicketTemplate", true);
+            oModel.setProperty("/uiState/newTicketTemplateName", "");
+            oModel.setProperty("/uiState/newTicketTemplateItems", [{ module: "", defaultPriority: "Medium", defaultHours: 8 }]);
+        },
+
+        onCancelNewTicketTemplate: function () {
+            this._resetTicketTemplateDraft();
+        },
+
+        onAddTicketTemplateItem: function () {
+            const oModel = this.getView().getModel();
+            const aItems = oModel.getProperty("/uiState/newTicketTemplateItems") || [];
+            aItems.push({ module: "", defaultPriority: "Medium", defaultHours: 8 });
+            oModel.setProperty("/uiState/newTicketTemplateItems", aItems);
+        },
+
+        onRemoveTicketTemplateItem: function (oEvent) {
+            const path = oEvent.getSource().getBindingContext().getPath();
+            const idx = parseInt(path.split("/").pop());
+            const oModel = this.getView().getModel();
+            const aItems = oModel.getProperty("/uiState/newTicketTemplateItems");
+            aItems.splice(idx, 1);
+            oModel.setProperty("/uiState/newTicketTemplateItems", aItems);
+        },
+
+        onImportTicketTemplateCSV: function () {
+            this.byId("ticketTemplateFileUploader").clear();
+            const oInput = this.byId("ticketTemplateFileUploader").getFocusDomRef();
+            if (oInput) oInput.click();
+        },
+
+        onImportTicketTemplateExcelFile: function (oEvent) {
+            const oFile = oEvent.getParameter("files") && oEvent.getParameter("files")[0];
+            if (!oFile) {
+                MessageToast.show("No file selected.");
+                return;
+            }
+
+            const oModel = this.getView().getModel();
+            if (!oModel.getProperty("/uiState/creatingNewTicketTemplate")) {
+                oModel.setProperty("/uiState/creatingNewTicketTemplate", true);
+                oModel.setProperty("/uiState/newTicketTemplateName", oFile.name.replace(/\.(csv|xlsx|xls)$/i, ""));
+                oModel.setProperty("/uiState/newTicketTemplateItems", []);
+            }
+
+            this._loadXLSXLibrary().then((XLSX) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const json = XLSX.utils.sheet_to_json(worksheet, { raw: false, defval: "" });
+
+                        if (!json || json.length === 0) {
+                            MessageToast.show("The file is empty or could not be parsed.");
+                            return;
+                        }
+
+                        const aExisting = oModel.getProperty("/uiState/newTicketTemplateItems") || [];
+                        const aNewItems = json.map(row => {
+                            const module = this._findColumnValue(row, ["Module", "Area", "Category", "module"]);
+                            const priorityRaw = this._findColumnValue(row, ["Priority", "Default Priority"]);
+                            const hoursRaw = this._findColumnValue(row, ["Hours", "Default Hours", "Hrs"]);
+                            const desc = this._findColumnValue(row, ["Description", "Description Template", "Notes"]);
+
+                            let priority = "Medium";
+                            if (priorityRaw) {
+                                const p = priorityRaw.toLowerCase();
+                                if (p.includes("high")) priority = "High";
+                                else if (p.includes("low")) priority = "Low";
+                            }
+
+                            return {
+                                module: module,
+                                defaultPriority: priority,
+                                defaultHours: parseInt(hoursRaw, 10) || 0,
+                                descriptionTemplate: desc || ""
+                            };
+                        }).filter(it => it.module);
+
+                        if (aNewItems.length === 0) {
+                            MessageToast.show("No rows with a Module column found.");
+                            return;
+                        }
+
+                        oModel.setProperty("/uiState/newTicketTemplateItems", aExisting.filter(it => it.module).concat(aNewItems));
+                        MessageToast.show("Added " + aNewItems.length + " item(s) from file.");
+                    } catch (error) {
+                        sap.m.MessageBox.error("Error reading file. Ensure it's a valid Excel or CSV file.");
+                        console.error("Ticket template import parse error:", error);
+                    }
+                };
+                reader.readAsArrayBuffer(oFile);
+            }).catch(err => {
+                MessageToast.show("Parsing library load failed.");
+                console.error(err);
+            });
         },
 
         onAddRoleToProject: function () {
@@ -718,7 +876,7 @@ sap.ui.define([
             const sPathProject = "/Projects('" + encodeURIComponent(sProjectId) + "')";
 
             try {
-                // Save the template association to localStorage (backend schema has no template_ID on Projects)
+                // Save the WBS-template association to localStorage (unrelated to Ticket Templates below)
                 const mProjectTemplateMap = JSON.parse(localStorage.getItem("projectTemplateMap") || "{}");
                 if (newProj.templateId) {
                     mProjectTemplateMap[sProjectId] = newProj.templateId;
@@ -727,12 +885,38 @@ sap.ui.define([
                 }
                 localStorage.setItem("projectTemplateMap", JSON.stringify(mProjectTemplateMap));
 
+                // If the user drafted a brand-new Ticket Template inline, create it now (real backend
+                // field — Projects.ticketTemplate_ID) and use its ID; otherwise use whatever was picked
+                // from the existing-templates Select.
+                let sTicketTemplateId = newProj.ticketTemplateId || null;
+                const bCreatingNewTicketTemplate = oModel.getProperty("/uiState/creatingNewTicketTemplate");
+                if (bCreatingNewTicketTemplate) {
+                    const sTplName = (oModel.getProperty("/uiState/newTicketTemplateName") || "").trim();
+                    const aTplItems = (oModel.getProperty("/uiState/newTicketTemplateItems") || []).filter(it => it && it.module);
+                    if (sTplName && aTplItems.length) {
+                        const sNewTplId = this._generateUuid();
+                        this._createEntry(oODataModel, "/TicketTemplates", { ID: sNewTplId, name: sTplName });
+                        aTplItems.forEach((it, idx) => {
+                            this._createEntry(oODataModel, "/TicketTemplateItems", {
+                                template_ID: sNewTplId,
+                                module: (it.module || "").toString().substring(0, 50),
+                                defaultPriority: it.defaultPriority || "Medium",
+                                defaultHours: parseInt(it.defaultHours, 10) || 0,
+                                descriptionTemplate: (it.descriptionTemplate || "").toString().substring(0, 500),
+                                sequence: idx + 1
+                            });
+                        });
+                        sTicketTemplateId = sNewTplId;
+                    }
+                }
+
                 if (editId) {
                     const oCtx = oODataModel.bindContext(sPathProject).getBoundContext();
                     oCtx.setProperty("name", newProj.name);
                     oCtx.setProperty("budget", parseFloat(newProj.budget) || 0);
                     oCtx.setProperty("startDate", this._formatDateForOData(newProj.startDate));
                     oCtx.setProperty("endDate", this._formatDateForOData(newProj.endDate));
+                    oCtx.setProperty("ticketTemplate_ID", sTicketTemplateId || null);
 
                     const aExistingRoles = await this._loadProjectRolesForProject(oODataModel, sProjectId);
                     for (const oRoleCtx of aExistingRoles) {
@@ -754,7 +938,8 @@ sap.ui.define([
                         name: newProj.name,
                         budget: parseFloat(newProj.budget) || 0,
                         startDate: this._formatDateForOData(newProj.startDate),
-                        endDate: this._formatDateForOData(newProj.endDate)
+                        endDate: this._formatDateForOData(newProj.endDate),
+                        ticketTemplate_ID: sTicketTemplateId || null
                     });
                     const requiredRoles = (newProj.requiredRoles || []).filter(r => r && r.role);
                     for (const r of requiredRoles) {
@@ -769,6 +954,7 @@ sap.ui.define([
                 await oODataModel.submitBatch(BATCH_GROUP);
                 this.byId("CreateProjectDialog").close();
                 MessageToast.show(editId ? "Project Updated" : "Project Saved");
+                this._resetTicketTemplateDraft();
                 await this._loadBackendData();
 
                 // Auto-import template tasks into WBS
@@ -2849,12 +3035,12 @@ sap.ui.define([
                 });
             oModel.setProperty("/employeeTickets", employeeTickets);
 
-            // Compute summary
-            const totalPlannedHours = employeeTasks.reduce((s, t) => s + (t.hours || 0), 0);
-            const totalWorkedHours = employeeTasks.reduce((s, t) => s + (t.liveWorkedHours || 0), 0);
-            const completedCount = employeeTasks.filter(t => t.status === "Completed").length;
-            const inProgressCount = employeeTasks.filter(t => t.status === "Working").length;
-            const totalCount = employeeTasks.length;
+            // Compute summary (ticket-based)
+            const totalPlannedHours = employeeTickets.reduce((s, t) => s + (t.hours || 0), 0);
+            const totalWorkedHours = employeeTickets.reduce((s, t) => s + (t.liveWorkedHours || 0), 0);
+            const completedCount = employeeTickets.filter(t => t.status === "Completed").length;
+            const inProgressCount = employeeTickets.filter(t => t.status === "Working").length;
+            const totalCount = employeeTickets.length;
 
             const nonBillableLogs = workLogs.filter(wl => wl.employee_ID === resourceId && wl.isBillable === false);
             const totalNonBillableHours = nonBillableLogs.reduce((s, wl) => s + (wl.hours || 0), 0);
@@ -3621,10 +3807,25 @@ sap.ui.define([
         },
 
         // --- Tickets Allocation Logic ---
+        _computeTicketsForSelectedProject: function () {
+            const oModel = this.getView().getModel();
+            const sProjectId = oModel.getProperty("/ticketsSelectedProjectId");
+            const aTickets = oModel.getProperty("/tickets") || [];
+            const aFiltered = sProjectId ? aTickets.filter(t => t.projectId === sProjectId) : aTickets;
+            oModel.setProperty("/ticketsForSelectedProject", aFiltered);
+        },
+
+        onTicketsProjectFilterChange: function () {
+            this._computeTicketsForSelectedProject();
+        },
+
         onOpenAddTicketDialog: function () {
             const oModel = this.getView().getModel();
-            oModel.setProperty("/newTicket", { date: this._formatDateForOData(new Date()), projectId: "", priority: "Medium", module: "", ticketNo: "", description: "", resourceId: "", onBehalfOfId: "", hours: "" });
-            oModel.setProperty("/ticketModulesForSelectedProject", []);
+            const sProjectId = oModel.getProperty("/ticketsSelectedProjectId") || "";
+            const project = sProjectId ? (oModel.getProperty("/projects") || []).find(p => p.id === sProjectId) : null;
+
+            oModel.setProperty("/newTicket", { date: this._formatDateForOData(new Date()), projectId: sProjectId, priority: "Medium", module: "", ticketNo: "", description: "", resourceId: "", onBehalfOfId: "", hours: "" });
+            oModel.setProperty("/ticketModulesForSelectedProject", this._getTicketModulesForProject(project));
 
             if (!this._oAddTicketDialog) {
                 this.loadFragment({
@@ -3639,19 +3840,28 @@ sap.ui.define([
             }
         },
 
+        // Returns the list of valid ticket module names for a project: prefers the project's
+        // assigned ticket template (once that feature exists) and falls back to its
+        // ProjectRoles ("Required Modules") list, which is today's only source.
+        _getTicketModulesForProject: function (project) {
+            if (!project) return [];
+            const aTicketTemplates = this.getView().getModel().getProperty("/ticketTemplates") || [];
+            const oTemplate = project.ticketTemplateId
+                ? aTicketTemplates.find(t => t.id === project.ticketTemplateId)
+                : null;
+            if (oTemplate && oTemplate.items && oTemplate.items.length) {
+                return oTemplate.items.map(it => it.module);
+            }
+            return project.requiredRoles ? project.requiredRoles.map(r => r.role) : [];
+        },
+
         onTicketAddProjectChange: function (oEvent) {
             const oModel = this.getView().getModel();
             const sProjectId = oEvent.getSource().getSelectedKey();
             const projects = oModel.getProperty("/projects") || [];
             const project = projects.find(p => p.id === sProjectId);
-            
-            if (project && project.requiredRoles) {
-                const projectModules = project.requiredRoles.map(r => r.role);
-                oModel.setProperty("/ticketModulesForSelectedProject", projectModules);
-            } else {
-                oModel.setProperty("/ticketModulesForSelectedProject", []);
-            }
-            
+
+            oModel.setProperty("/ticketModulesForSelectedProject", this._getTicketModulesForProject(project));
             oModel.setProperty("/newTicket/module", "");
         },
 
@@ -3682,11 +3892,7 @@ sap.ui.define([
 
             const projects = oModel.getProperty("/projects") || [];
             const project = projects.find(p => p.id === oTicket.projectId);
-            if (project && project.requiredRoles) {
-                oModel.setProperty("/ticketModulesForSelectedProject", project.requiredRoles.map(r => r.role));
-            } else {
-                oModel.setProperty("/ticketModulesForSelectedProject", []);
-            }
+            oModel.setProperty("/ticketModulesForSelectedProject", this._getTicketModulesForProject(project));
 
             if (!this._oEditTicketDialog) {
                 this.loadFragment({
@@ -3706,13 +3912,8 @@ sap.ui.define([
             const sProjectId = oEvent.getSource().getSelectedKey();
             const projects = oModel.getProperty("/projects") || [];
             const project = projects.find(p => p.id === sProjectId);
-            
-            if (project && project.requiredRoles) {
-                oModel.setProperty("/ticketModulesForSelectedProject", project.requiredRoles.map(r => r.role));
-            } else {
-                oModel.setProperty("/ticketModulesForSelectedProject", []);
-            }
-            
+
+            oModel.setProperty("/ticketModulesForSelectedProject", this._getTicketModulesForProject(project));
             oModel.setProperty("/editTicket/module", "");
         },
 
@@ -3974,11 +4175,13 @@ sap.ui.define([
             const oTicket = oModel.getProperty(sPath);
 
             if (!oTicket || !oTicket.id) {
-                // Fallback for local-only tickets (e.g. imported but not yet persisted)
-                const iIndex = sPath.split("/").pop();
-                const aTickets = oModel.getProperty("/tickets");
-                aTickets.splice(iIndex, 1);
-                oModel.setProperty("/tickets", [...aTickets]);
+                // Fallback for local-only tickets (e.g. imported but not yet persisted).
+                // Filter by object identity rather than parsing the row index from sPath,
+                // since sPath is relative to whichever array the table is currently bound
+                // to (/ticketsForSelectedProject when a project filter is active), not /tickets.
+                const aTickets = oModel.getProperty("/tickets") || [];
+                oModel.setProperty("/tickets", aTickets.filter(t => t !== oTicket));
+                this._computeTicketsForSelectedProject();
                 oModel.refresh(true);
                 return;
             }
@@ -3999,6 +4202,12 @@ sap.ui.define([
         },
 
         onImportTicketsCSV: function () {
+            const sProjectId = this.getView().getModel().getProperty("/ticketsSelectedProjectId");
+            if (!sProjectId) {
+                MessageToast.show("Please select a project to import tickets into first.");
+                return;
+            }
+
             this.byId("ticketsExcelFileUploader").clear();
             // Programmatically trigger the hidden file uploader
             var oUploader = this.byId("ticketsExcelFileUploader");
@@ -4062,13 +4271,27 @@ sap.ui.define([
             const aResources = oModel.getProperty("/resources") || [];
             const oODataModel = this._getODataModel();
 
+            const sProjectId = oModel.getProperty("/ticketsSelectedProjectId");
+            const oProject = aProjects.find(p => p.id === sProjectId);
+            if (!oProject) {
+                MessageToast.show("Please select a project to import tickets into first.");
+                return;
+            }
+
+            // If the project has a ticket template assigned, imported rows are validated
+            // against its module list; otherwise any module text is accepted (current behavior).
+            const aTicketTemplates = oModel.getProperty("/ticketTemplates") || [];
+            const oTemplate = oProject.ticketTemplateId
+                ? aTicketTemplates.find(t => t.id === oProject.ticketTemplateId)
+                : null;
+
             let iCount = 0;
             let iSkipped = 0;
+            let iSkippedModule = 0;
 
             for (const row of dataArray) {
                 // Try to find matching columns based on common names using the shared helper
                 const dateRaw = this._findColumnValue(row, ["Date", "Created At", "date", "Date Ref", "Date Logged", "Created", "Opened"]);
-                const projectNameStr = this._findColumnValue(row, ["Project", "Project Name", "Project Title", "project"]);
                 const module = this._findColumnValue(row, ["Module", "Area", "Category", "module", "Module Name", "Task type", "Assignment group"]);
                 const ticketNo = this._findColumnValue(row, ["Ticket No", "Ticket Ref", "Reference", "ID", "ticketNo", "Ticket #", "Number"]);
                 const desc = this._findColumnValue(row, ["Description", "Descrption", "Ticket Description", "Summary", "Details", "description", "Subject", "Desc", "Task Description", "Ticket Desc", "Short Description"]);
@@ -4079,11 +4302,17 @@ sap.ui.define([
                 const statusRaw = this._findColumnValue(row, ["Status", "State"]);
 
                 if (ticketNo || desc) {
-                    const matchedProj = aProjects.find(p =>
-                        p.name && projectNameStr &&
-                        (p.name.toLowerCase().trim() === projectNameStr.toLowerCase().trim() ||
-                            p.id.toLowerCase().trim() === projectNameStr.toLowerCase().trim())
-                    );
+                    // Match the row's Module against the project's ticket template, if it has one
+                    let oTemplateItem = null;
+                    if (oTemplate) {
+                        oTemplateItem = (oTemplate.items || []).find(it =>
+                            it.module && module && it.module.toLowerCase().trim() === module.toLowerCase().trim()
+                        );
+                        if (!oTemplateItem) {
+                            iSkippedModule++;
+                            continue;
+                        }
+                    }
 
                     const matchedRes = aResources.find(r =>
                         r.name && resourceStr &&
@@ -4103,22 +4332,26 @@ sap.ui.define([
                         else if (s.includes("pend") || s.includes("hold") || s.includes("paus")) ticketStatus = "Paused";
                     }
 
-                    let ticketPriority = "Medium";
+                    let ticketPriority = priorityRaw ? null : (oTemplateItem ? oTemplateItem.defaultPriority : null);
                     if (priorityRaw) {
                         const p = priorityRaw.toLowerCase();
                         if (p.includes("high") || p.includes("critical") || p.includes("urgent")) ticketPriority = "High";
                         else if (p.includes("low") || p.includes("minor")) ticketPriority = "Low";
+                        else ticketPriority = "Medium";
                     }
+                    ticketPriority = ticketPriority || "Medium";
+
+                    const iHours = parseInt(hoursRaw, 10) || (oTemplateItem ? (oTemplateItem.defaultHours || 0) : 0);
 
                     this._createEntry(oODataModel, "/Tickets", {
-                        project_ID: matchedProj ? matchedProj.id : null,
+                        project_ID: oProject.id,
                         date: this._formatDateForOData(dateRaw) || this._formatDateForOData(new Date()),
                         module: (module || "Imported").toString().substring(0, 50),
                         ticketNo: (ticketNo || "TKT-GEN").toString().substring(0, 50),
                         description: desc ? desc.toString().substring(0, 500) : "",
                         resource_ID: matchedRes ? matchedRes.id : null,
                         onBehalfOf_ID: matchedBehalf ? matchedBehalf.id : null,
-                        hours: parseInt(hoursRaw, 10) || 0,
+                        hours: iHours,
                         priority: ticketPriority,
                         status: ticketStatus
                     });
@@ -4132,7 +4365,10 @@ sap.ui.define([
                 try {
                     // Using $auto group which is defined as a constant
                     await oODataModel.submitBatch(BATCH_GROUP);
-                    MessageToast.show("Imported " + iCount + " tickets successfully. (Skipped " + iSkipped + " invalid rows)");
+                    let sMsg = "Imported " + iCount + " tickets into " + oProject.name + ".";
+                    if (iSkipped > 0) sMsg += " Skipped " + iSkipped + " invalid row(s).";
+                    if (iSkippedModule > 0) sMsg += " Skipped " + iSkippedModule + " row(s) with a module not in this project's ticket template.";
+                    MessageToast.show(sMsg);
                     await this._loadBackendData();
                 } catch (err) {
                     MessageToast.show("Failed to save imported tickets to database.");

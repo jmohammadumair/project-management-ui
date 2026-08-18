@@ -23,6 +23,7 @@
                 <EntitySet Name="Projects" EntityType="ProjectManagerService.Projects">
                     <NavigationPropertyBinding Path="requiredRoles" Target="ProjectRoles"/>
                     <NavigationPropertyBinding Path="allocations" Target="Allocations"/>
+                    <NavigationPropertyBinding Path="ticketTemplate" Target="TicketTemplates"/>
                 </EntitySet>
                 <EntitySet Name="Resources" EntityType="ProjectManagerService.Resources">
                     <NavigationPropertyBinding Path="roles" Target="ResourceRoles"/>
@@ -67,6 +68,12 @@
                     <NavigationPropertyBinding Path="resource" Target="Resources"/>
                     <NavigationPropertyBinding Path="onBehalfOf" Target="Resources"/>
                 </EntitySet>
+                <EntitySet Name="TicketTemplates" EntityType="ProjectManagerService.TicketTemplates">
+                    <NavigationPropertyBinding Path="items" Target="TicketTemplateItems"/>
+                </EntitySet>
+                <EntitySet Name="TicketTemplateItems" EntityType="ProjectManagerService.TicketTemplateItems">
+                    <NavigationPropertyBinding Path="template" Target="TicketTemplates"/>
+                </EntitySet>
             </EntityContainer>
             <EntityType Name="Projects">
                 <Key>
@@ -81,6 +88,10 @@
                     <OnDelete Action="Cascade"/>
                 </NavigationProperty>
                 <NavigationProperty Name="allocations" Type="Collection(ProjectManagerService.Allocations)" Partner="project"/>
+                <NavigationProperty Name="ticketTemplate" Type="ProjectManagerService.TicketTemplates">
+                    <ReferentialConstraint Property="ticketTemplate_ID" ReferencedProperty="ID"/>
+                </NavigationProperty>
+                <Property Name="ticketTemplate_ID" Type="Edm.Guid"/>
             </EntityType>
             <EntityType Name="Resources">
                 <Key>
@@ -204,7 +215,7 @@
                 <Property Name="hours" Type="Edm.Int32"/>
                 <Property Name="startDate" Type="Edm.Date"/>
                 <Property Name="endDate" Type="Edm.Date"/>
-                <Property Name="status" Type="Edm.String" MaxLength="20"/>
+                <Property Name="status" Type="Edm.String" MaxLength="20" DefaultValue="Not Started"/>
                 <Property Name="sequence" Type="Edm.Int32"/>
                 <NavigationProperty Name="predecessor" Type="ProjectManagerService.WBSTasks">
                     <ReferentialConstraint Property="predecessor_ID" ReferencedProperty="ID"/>
@@ -234,7 +245,7 @@
                 <Property Name="ticket_ID" Type="Edm.Guid"/>
                 <Property Name="date" Type="Edm.Date"/>
                 <Property Name="hours" Type="Edm.Decimal" Precision="5" Scale="2"/>
-                <Property Name="isBillable" Type="Edm.Boolean"/>
+                <Property Name="isBillable" Type="Edm.Boolean" DefaultValue="true"/>
                 <Property Name="nonBillableType" Type="Edm.String" MaxLength="50"/>
                 <Property Name="description" Type="Edm.String" MaxLength="500"/>
             </EntityType>
@@ -245,7 +256,7 @@
                 <Property Name="ID" Type="Edm.Guid" Nullable="false"/>
                 <Property Name="date" Type="Edm.Date"/>
                 <Property Name="hours" Type="Edm.Decimal" Precision="5" Scale="2"/>
-                <Property Name="isBillable" Type="Edm.Boolean"/>
+                <Property Name="isBillable" Type="Edm.Boolean" DefaultValue="true"/>
                 <Property Name="nonBillableType" Type="Edm.String" MaxLength="50"/>
                 <Property Name="description" Type="Edm.String" MaxLength="500"/>
                 <Property Name="employeeId" Type="Edm.String" MaxLength="10"/>
@@ -276,9 +287,9 @@
                 <Property Name="role_ID" Type="Edm.Guid"/>
                 <Property Name="ticketNo" Type="Edm.String" MaxLength="50"/>
                 <Property Name="description" Type="Edm.String" MaxLength="500"/>
-                <Property Name="priority" Type="Edm.String" MaxLength="20"/>
+                <Property Name="priority" Type="Edm.String" MaxLength="20" DefaultValue="Medium"/>
                 <Property Name="hours" Type="Edm.Int32"/>
-                <Property Name="status" Type="Edm.String" MaxLength="20"/>
+                <Property Name="status" Type="Edm.String" MaxLength="20" DefaultValue="Not Started"/>
                 <NavigationProperty Name="resource" Type="ProjectManagerService.Resources">
                     <ReferentialConstraint Property="resource_ID" ReferencedProperty="ID"/>
                 </NavigationProperty>
@@ -288,6 +299,31 @@
                 </NavigationProperty>
                 <Property Name="onBehalfOf_ID" Type="Edm.String" MaxLength="10"/>
             </EntityType>
+            <EntityType Name="TicketTemplates">
+                <Key>
+                    <PropertyRef Name="ID"/>
+                </Key>
+                <Property Name="ID" Type="Edm.Guid" Nullable="false"/>
+                <Property Name="name" Type="Edm.String" MaxLength="100"/>
+                <NavigationProperty Name="items" Type="Collection(ProjectManagerService.TicketTemplateItems)" Partner="template">
+                    <OnDelete Action="Cascade"/>
+                </NavigationProperty>
+            </EntityType>
+            <EntityType Name="TicketTemplateItems">
+                <Key>
+                    <PropertyRef Name="ID"/>
+                </Key>
+                <Property Name="ID" Type="Edm.Guid" Nullable="false"/>
+                <NavigationProperty Name="template" Type="ProjectManagerService.TicketTemplates" Partner="items">
+                    <ReferentialConstraint Property="template_ID" ReferencedProperty="ID"/>
+                </NavigationProperty>
+                <Property Name="template_ID" Type="Edm.Guid"/>
+                <Property Name="module" Type="Edm.String" MaxLength="50"/>
+                <Property Name="defaultPriority" Type="Edm.String" MaxLength="20" DefaultValue="Medium"/>
+                <Property Name="defaultHours" Type="Edm.Int32"/>
+                <Property Name="descriptionTemplate" Type="Edm.String" MaxLength="500"/>
+                <Property Name="sequence" Type="Edm.Int32"/>
+            </EntityType>
             <Annotations Target="ProjectManagerService.Allocations/ID">
                 <Annotation Term="Core.ComputedDefaultValue" Bool="true"/>
             </Annotations>
@@ -295,21 +331,6 @@
                 <Annotation Term="Core.ComputedDefaultValue" Bool="true"/>
             </Annotations>
             <Annotations Target="ProjectManagerService.ResourceRoles/ID">
-                <Annotation Term="Core.ComputedDefaultValue" Bool="true"/>
-            </Annotations>
-            <Annotations Target="ProjectManagerService.TemplatePhases/ID">
-                <Annotation Term="Core.ComputedDefaultValue" Bool="true"/>
-            </Annotations>
-            <Annotations Target="ProjectManagerService.TemplateTasks/ID">
-                <Annotation Term="Core.ComputedDefaultValue" Bool="true"/>
-            </Annotations>
-            <Annotations Target="ProjectManagerService.WBSTasks/ID">
-                <Annotation Term="Core.ComputedDefaultValue" Bool="true"/>
-            </Annotations>
-            <Annotations Target="ProjectManagerService.WorkLogs/ID">
-                <Annotation Term="Core.ComputedDefaultValue" Bool="true"/>
-            </Annotations>
-            <Annotations Target="ProjectManagerService.Tickets/ID">
                 <Annotation Term="Core.ComputedDefaultValue" Bool="true"/>
             </Annotations>
             <Annotations Target="ProjectManagerService.EntityContainer/Analytics_Cost_Consumption">
@@ -332,6 +353,18 @@
             <Annotations Target="ProjectManagerService.Analytics_Cost_Consumption/consumedCost">
                 <Annotation Term="Core.Computed" Bool="true"/>
             </Annotations>
+            <Annotations Target="ProjectManagerService.TemplatePhases/ID">
+                <Annotation Term="Core.ComputedDefaultValue" Bool="true"/>
+            </Annotations>
+            <Annotations Target="ProjectManagerService.TemplateTasks/ID">
+                <Annotation Term="Core.ComputedDefaultValue" Bool="true"/>
+            </Annotations>
+            <Annotations Target="ProjectManagerService.WBSTasks/ID">
+                <Annotation Term="Core.ComputedDefaultValue" Bool="true"/>
+            </Annotations>
+            <Annotations Target="ProjectManagerService.WorkLogs/ID">
+                <Annotation Term="Core.ComputedDefaultValue" Bool="true"/>
+            </Annotations>
             <Annotations Target="ProjectManagerService.EntityContainer/EDiaryView">
                 <Annotation Term="Capabilities.DeleteRestrictions">
                     <Record Type="Capabilities.DeleteRestrictionsType">
@@ -348,6 +381,18 @@
                         <PropertyValue Property="Updatable" Bool="false"/>
                     </Record>
                 </Annotation>
+            </Annotations>
+            <Annotations Target="ProjectManagerService.EDiaryView/ID">
+                <Annotation Term="Core.ComputedDefaultValue" Bool="true"/>
+            </Annotations>
+            <Annotations Target="ProjectManagerService.Tickets/ID">
+                <Annotation Term="Core.ComputedDefaultValue" Bool="true"/>
+            </Annotations>
+            <Annotations Target="ProjectManagerService.TicketTemplates/ID">
+                <Annotation Term="Core.ComputedDefaultValue" Bool="true"/>
+            </Annotations>
+            <Annotations Target="ProjectManagerService.TicketTemplateItems/ID">
+                <Annotation Term="Core.ComputedDefaultValue" Bool="true"/>
             </Annotations>
         </Schema>
     </edmx:DataServices>

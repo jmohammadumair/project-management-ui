@@ -32,7 +32,7 @@
 
 
 _schema-version: 3.3.0
-ID: project_management_ui
+ID: time_tracker
 version: 0.0.1
 description: "An SAP Fiori application."
 parameters:
@@ -55,7 +55,7 @@ build-parameters:
 #         - npm run build
  
 modules:
-  - name: project_management_ui-ui
+  - name: time_tracker-ui
     type: html5
     path: webapp
     parameters:
@@ -67,7 +67,7 @@ modules:
         - npm install
         - npm run build
 
-  - name: project_management_ui-approuter
+  - name: time_tracker-approuter
     type: approuter.nodejs
     path: approuter
     parameters:
@@ -83,7 +83,7 @@ modules:
           },
           {
             "name": "project-management-ui",
-            "url": "https://ed5141e1trial-dev-project-management-ui-ui.cfapps.us10-001.hana.ondemand.com",
+            "url": "https://ed5141e1trial-dev-time-tracker-ui.cfapps.us10-001.hana.ondemand.com",
             "forwardAuthToken": false
           }
         ]

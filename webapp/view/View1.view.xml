@@ -256,7 +256,7 @@
 
                     
 
-                    <IconTabFilter text="Project WBS" key="wbs" icon="sap-icon://org-chart">
+                    <IconTabFilter text="Project WBS" key="wbs" icon="sap-icon://org-chart" visible="false">
                         <VBox class="tableWrapper sapUiMediumMarginTop">
                             <VBox class="kpiCard sapUiSmallMarginBottom" style="padding: 1rem;">
                                 <HBox justifyContent="SpaceBetween" alignItems="Center" width="100%" wrap="Wrap">
@@ -334,7 +334,7 @@
                         </VBox>
                     </IconTabFilter>
 
-                    <IconTabFilter text="Timeline" key="timeline" icon="sap-icon://calendar">
+                    <IconTabFilter text="Timeline" key="timeline" icon="sap-icon://calendar" visible="false">
                         <VBox class="tableWrapper sapUiMediumMarginTop">
                             <VBox class="kpiCard sapUiSmallMarginBottom" style="padding: 1.5rem 1.5rem 0 1.5rem; border-radius: 6px;">
                                 <HBox justifyContent="SpaceBetween" alignItems="Center" width="100%">
@@ -502,7 +502,7 @@
                             </VBox>
 
                             <!-- KPI Summary Cards -->
-                            <VBox visible="{= !!${/employeeSelectedResourceId} &amp;&amp; ${/employeeTasks}.length > 0 &amp;&amp; !${/employeeTasksNotRunning} }">
+                            <VBox visible="{= !!${/employeeSelectedResourceId} &amp;&amp; ${/employeeTickets}.length > 0 }">
                                 <HBox wrap="Wrap" justifyContent="SpaceBetween" class="kpiContainer sapUiSmallMarginBottom">
                                     <VBox class="kpiCard borderBlue">
                                         <Text text="Total Planned Hours" class="kpiTitle"/>
@@ -515,10 +515,10 @@
                                     <VBox class="kpiCard borderTeal">
                                         <Text text="Completion Rate" class="kpiTitle"/>
                                         <Title text="{/employeeTimeSummary/completionPercent}%" class="kpiValue"/>
-                                        <Text text="{/employeeTimeSummary/completedCount} of {/employeeTimeSummary/totalCount} tasks" class="kpiSubText"/>
+                                        <Text text="{/employeeTimeSummary/completedCount} of {/employeeTimeSummary/totalCount} tickets" class="kpiSubText"/>
                                     </VBox>
                                     <VBox class="kpiCard borderOrange">
-                                        <Text text="Active Tasks" class="kpiTitle"/>
+                                        <Text text="Active Tickets" class="kpiTitle"/>
                                         <Title text="{/employeeTimeSummary/inProgressCount}" class="kpiValue"/>
                                         <Text text="Currently In Progress" class="kpiSubText"/>
                                     </VBox>
@@ -584,7 +584,7 @@
                             </VBox>
 
                             <!-- Employee Tasks Table (planning data only) -->
-                            <VBox visible="{= !!${/employeeSelectedResourceId} &amp;&amp; ${/employeeTasks}.length > 0 }" class="customPanel" style="overflow-x: auto;">
+                            <VBox visible="false" class="customPanel" style="overflow-x: auto;">
                                 <Panel backgroundDesign="Solid" class="customPanel">
                                     <headerToolbar>
                                         <Toolbar height="3rem" style="Clear">
@@ -668,8 +668,8 @@
                                 </Panel>
                             </VBox>
 
-                            <!-- Empty State -->
-                            <VBox visible="{= !!${/employeeSelectedResourceId} &amp;&amp; ${/employeeTasks}.length === 0 }" class="kpiCard" style="background-color: #f9fafb; padding: 2rem; align-items: center; justify-content: center; min-height: 200px;">
+                            <!-- Empty State (hidden along with the Assigned Tasks table) -->
+                            <VBox visible="false" class="kpiCard" style="background-color: #f9fafb; padding: 2rem; align-items: center; justify-content: center; min-height: 200px;">
                                 <core:Icon src="sap-icon://task" size="3rem" color="#d1d5db" class="sapUiSmallMarginBottom" />
                                 <Text text="No tasks assigned to this resource." class="boldText" />
                                 <Text text="Assign tasks in the Project WBS tab." class="lightText textXs sapUiTinyMarginTop" />
@@ -760,7 +760,7 @@
                                             <Column hAlign="Begin" demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Project" class="colText" wrapping="false" textAlign="Center"/></Column>
                                             <Column hAlign="Center" demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Ticket No" class="colText" wrapping="false" textAlign="Center"/></Column>
                                             <Column hAlign="Begin" demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Ticket Description" class="colText" wrapping="false" textAlign="Center"/></Column>
-                                            <Column hAlign="Begin"><Text text="Task" class="colText" wrapping="false" textAlign="Center"/></Column>
+                                            <Column hAlign="Begin" visible="false"><Text text="Task" class="colText" wrapping="false" textAlign="Center"/></Column>
                                             <Column hAlign="Center" demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Reallocation" class="colText" wrapping="false" textAlign="Center"/></Column>
                                             <Column hAlign="Center" width="8rem" demandPopin="true" minScreenWidth="Phone" popinDisplay="Inline"><Text text="Status" class="colText" wrapping="false" textAlign="Center"/></Column>
                                             <Column hAlign="Center" width="5rem" demandPopin="true" minScreenWidth="Phone" popinDisplay="Inline"><Text text="Hours" class="colText" wrapping="false" textAlign="Center"/></Column>
@@ -821,9 +821,17 @@
                                 </HBox>
                             </HBox>
 
+                            <!-- Project Filter -->
+                            <VBox class="sapUiSmallMarginBottom" width="16rem">
+                                <Label text="Filter by Project" class="filterLabel" />
+                                <Select selectedKey="{/ticketsSelectedProjectId}" items="{path: '/projects'}" forceSelection="false" change="onTicketsProjectFilterChange" width="100%" class="forceWhiteSelect">
+                                    <core:Item key="{id}" text="{name}" />
+                                </Select>
+                            </VBox>
+
                             <!-- Tickets Table -->
-                            <VBox class="customPanel" style="overflow-x: auto;" visible="{= ${/tickets}.length > 0}">
-                                <Table items="{/tickets}" class="customTable" mode="None">
+                            <VBox class="customPanel" style="overflow-x: auto;" visible="{= ${/ticketsForSelectedProject}.length > 0}">
+                                <Table items="{/ticketsForSelectedProject}" class="customTable" mode="None">
                                     <columns>
                                         <Column width="7rem"><Text text="Date" class="colText"/></Column>
                                         <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Project Name" class="colText"/></Column>
@@ -859,9 +867,9 @@
                             </VBox>
 
                             <!-- Empty State -->
-                            <VBox visible="{= ${/tickets}.length === 0 }" class="kpiCard" style="background-color: #f9fafb; padding: 2rem; align-items: center; justify-content: center; min-height: 200px;">
+                            <VBox visible="{= ${/ticketsForSelectedProject}.length === 0 }" class="kpiCard" style="background-color: #f9fafb; padding: 2rem; align-items: center; justify-content: center; min-height: 200px;">
                                 <core:Icon src="sap-icon://sys-monitor" size="3rem" color="#d1d5db" class="sapUiSmallMarginBottom" />
-                                <Text text="No tickets allocated yet." class="boldText" />
+                                <Text text="{= !!${/ticketsSelectedProjectId} ? 'No tickets for this project yet.' : 'No tickets allocated yet.' }" class="boldText" />
                                 <Text text="Click '+ Add Ticket' or 'Import' to add tickets." class="lightText textXs sapUiTinyMarginTop" />
                             </VBox>
 
