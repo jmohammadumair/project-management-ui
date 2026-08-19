@@ -147,6 +147,8 @@ sap.ui.define([
                 tickets: [],
                 ticketsForSelectedProject: [],
                 ticketsSelectedProjectId: "",
+                ticketsHasDynamicTemplate: false,
+                ticketsDynamicRows: [],
                 newTicket: { date: "", module: "", ticketNo: "", description: "", resourceId: "", onBehalfOfId: "", hours: "" },
 
                 analytics: {
@@ -3811,13 +3813,205 @@ sap.ui.define([
             const oModel = this.getView().getModel();
             const sProjectId = oModel.getProperty("/ticketsSelectedProjectId");
             const aTickets = oModel.getProperty("/tickets") || [];
-            const aFiltered = sProjectId ? aTickets.filter(t => t.projectId === sProjectId) : aTickets;
+            const aFiltered = sProjectId ? aTickets.filter(t => t.projectId === sProjectId) : [];
             oModel.setProperty("/ticketsForSelectedProject", aFiltered);
+
+            // Check if this project has a ticket template for dynamic columns
+            const aProjects = oModel.getProperty("/projects") || [];
+            const oProject = sProjectId ? aProjects.find(p => p.id === sProjectId) : null;
+            const aTicketTemplates = oModel.getProperty("/ticketTemplates") || [];
+            const oTemplate = oProject && oProject.ticketTemplateId
+                ? aTicketTemplates.find(t => t.id === oProject.ticketTemplateId)
+                : null;
+
+            if (oTemplate && oTemplate.items && oTemplate.items.length) {
+                oModel.setProperty("/ticketsHasDynamicTemplate", true);
+                this._buildDynamicTicketsTable(oTemplate.items);
+                this._computeDynamicTicketRows(aFiltered, oTemplate.items);
+            } else {
+                oModel.setProperty("/ticketsHasDynamicTemplate", false);
+                oModel.setProperty("/ticketsDynamicRows", []);
+                // Clean up old dynamic table
+                var oContainer = this.byId("dynamicTicketsTableContainer");
+                if (oContainer) oContainer.destroyItems();
+            }
         },
 
         onTicketsProjectFilterChange: function () {
             this._computeTicketsForSelectedProject();
         },
+
+        /**
+         * Programmatically builds a sap.m.Table with columns from the project's
+         * ticket template headers. Each template header becomes a column showing
+         * the ticket description. Fixed columns (Ticket No, Date, Actions) are added too.
+         */
+        _buildDynamicTicketsTable: function (aTemplateItems) {
+            var oContainer = this.byId("dynamicTicketsTableContainer");
+            if (!oContainer) return;
+
+            // Destroy any previously built table
+            oContainer.destroyItems();
+
+            var that = this;
+            var oTable = new sap.m.Table({
+                mode: "None",
+                fixedLayout: false,
+                noDataText: "No tickets imported yet. Click 'Import' to add tickets."
+            });
+            oTable.addStyleClass("customTable");
+
+            // --- Add Columns ---
+            // 1. Ticket No column
+            oTable.addColumn(new sap.m.Column({
+                width: "8rem",
+                header: new sap.m.Text({ text: "Ticket No" }).addStyleClass("colText")
+            }));
+
+            // 2. Date column
+            oTable.addColumn(new sap.m.Column({
+                width: "7rem",
+                header: new sap.m.Text({ text: "Date" }).addStyleClass("colText")
+            }));
+
+            // 3. Template header columns
+            aTemplateItems.forEach(function (item, idx) {
+                oTable.addColumn(new sap.m.Column({
+                    width: "12rem",
+                    header: new sap.m.Text({ text: item.module }).addStyleClass("colText")
+                }));
+            });
+
+            // 4. Actions column
+            oTable.addColumn(new sap.m.Column({
+                width: "5rem",
+                hAlign: "Center",
+                header: new sap.m.Text({ text: "" })
+            }));
+
+            // --- Bind items with factory function ---
+            oTable.bindItems("/ticketsDynamicRows", function (sId, oContext) {
+                var aCells = [];
+
+                // Ticket No cell
+                aCells.push(new sap.m.Text({
+                    text: "{ticketNo}"
+                }).addStyleClass("boldText customBlueText"));
+
+                // Date cell
+                aCells.push(new sap.m.Text({
+                    text: { path: "date", formatter: that.formatDate.bind(that) }
+                }).addStyleClass("boldText"));
+
+                // Template header cells — each shows the description from that module column
+                aTemplateItems.forEach(function (item, idx) {
+                    aCells.push(new sap.m.Text({
+                        text: "{col_" + idx + "}"
+                    }).addStyleClass("lightText textXs"));
+                });
+
+                // Actions cell — delete button
+                var oDeleteBtn = new sap.m.Button({
+                    icon: "sap-icon://delete",
+                    type: "Transparent",
+                    tooltip: "Delete Row",
+                    press: function (oEvent) {
+                        that._onDeleteDynamicTicketRow(oEvent);
+                    }
+                }).addStyleClass("actionDelete");
+
+                aCells.push(oDeleteBtn);
+
+                return new sap.m.ColumnListItem({
+                    vAlign: "Middle",
+                    cells: aCells
+                }).addStyleClass("hoverableRow");
+            });
+
+            oContainer.addItem(oTable);
+        },
+
+        /**
+         * Pivots the ticket data for the selected project into rows where each
+         * template header has its own column. Tickets are grouped by ticketNo
+         * (or row index) so multiple modules from the same row appear side-by-side.
+         */
+        _computeDynamicTicketRows: function (aTickets, aTemplateItems) {
+            var oModel = this.getView().getModel();
+
+            // Build a map: module name (lower) → column key
+            var mModuleToCol = {};
+            aTemplateItems.forEach(function (item, idx) {
+                if (item.module) {
+                    mModuleToCol[item.module.toLowerCase().trim()] = "col_" + idx;
+                }
+            });
+
+            // Group tickets by ticketNo to form rows
+            var mRowsByTicketNo = {};
+            var aRowOrder = [];
+
+            aTickets.forEach(function (ticket) {
+                var sKey = ticket.ticketNo || ticket.id;
+                if (!mRowsByTicketNo[sKey]) {
+                    mRowsByTicketNo[sKey] = {
+                        ticketNo: ticket.ticketNo || "",
+                        date: ticket.date || "",
+                        _ticketIds: []
+                    };
+                    // Initialize all header columns to empty
+                    aTemplateItems.forEach(function (item, idx) {
+                        mRowsByTicketNo[sKey]["col_" + idx] = "";
+                    });
+                    aRowOrder.push(sKey);
+                }
+
+                // Place the ticket description in the matching column
+                var sModuleLower = (ticket.module || "").toLowerCase().trim();
+                var sColKey = mModuleToCol[sModuleLower];
+                if (sColKey) {
+                    mRowsByTicketNo[sKey][sColKey] = ticket.description || ticket.module;
+                }
+                mRowsByTicketNo[sKey]._ticketIds.push(ticket.id);
+            });
+
+            var aDynamicRows = aRowOrder.map(function (key) { return mRowsByTicketNo[key]; });
+            oModel.setProperty("/ticketsDynamicRows", aDynamicRows);
+        },
+
+        /**
+         * Deletes all tickets associated with a dynamic row.
+         */
+        _onDeleteDynamicTicketRow: async function (oEvent) {
+            var oContext = oEvent.getSource().getBindingContext();
+            if (!oContext) return;
+            var oRow = oContext.getObject();
+            var aTicketIds = oRow._ticketIds || [];
+
+            if (aTicketIds.length === 0) return;
+
+            var oODataModel = this._getODataModel();
+            var that = this;
+
+            MessageBox.confirm("Delete this row and its " + aTicketIds.length + " ticket(s)?", {
+                onClose: async function (sAction) {
+                    if (sAction !== MessageBox.Action.OK) return;
+                    try {
+                        aTicketIds.forEach(function (id) {
+                            var sPath = "/Tickets('" + encodeURIComponent(id) + "')";
+                            oODataModel.delete(sPath, BATCH_GROUP);
+                        });
+                        await oODataModel.submitBatch(BATCH_GROUP);
+                        MessageToast.show("Deleted " + aTicketIds.length + " ticket(s).");
+                        await that._loadBackendData();
+                    } catch (err) {
+                        MessageToast.show("Failed to delete tickets.");
+                        console.error(err);
+                    }
+                }
+            });
+        },
+
 
         onOpenAddTicketDialog: function () {
             const oModel = this.getView().getModel();
@@ -4201,33 +4395,122 @@ sap.ui.define([
             }
         },
 
+        onDeleteAllTicketsForProject: function () {
+            const oModel = this.getView().getModel();
+            const sProjectId = oModel.getProperty("/ticketsSelectedProjectId");
+            const aTickets = oModel.getProperty("/ticketsForSelectedProject") || [];
+
+            if (!sProjectId || aTickets.length === 0) {
+                MessageToast.show("No tickets to delete for the selected project.");
+                return;
+            }
+
+            MessageBox.confirm("Are you sure you want to permanently delete all " + aTickets.length + " ticket(s) for this project?", {
+                title: "Confirm Delete All",
+                icon: MessageBox.Icon.WARNING,
+                actions: [MessageBox.Action.DELETE, MessageBox.Action.CANCEL],
+                emphasizedAction: MessageBox.Action.DELETE,
+                onClose: async (sAction) => {
+                    if (sAction === MessageBox.Action.DELETE) {
+                        try {
+                            const oODataModel = this._getODataModel();
+                            let iCount = 0;
+                            
+                            for (const ticket of aTickets) {
+                                if (ticket && ticket.id) {
+                                    const sPath = "/Tickets(" + ticket.id + ")";
+                                    oODataModel.delete(sPath, BATCH_GROUP);
+                                    iCount++;
+                                    
+                                    // Chunk deletion to avoid massive payload/timeout errors
+                                    if (iCount % 50 === 0) {
+                                        await oODataModel.submitBatch(BATCH_GROUP);
+                                        if (oODataModel.hasPendingChanges(BATCH_GROUP)) {
+                                            oODataModel.resetChanges(BATCH_GROUP);
+                                            throw new Error("Batch deletion failed for some tickets.");
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            if (oODataModel.hasPendingChanges(BATCH_GROUP)) {
+                                await oODataModel.submitBatch(BATCH_GROUP);
+                                if (oODataModel.hasPendingChanges(BATCH_GROUP)) {
+                                    oODataModel.resetChanges(BATCH_GROUP);
+                                    throw new Error("Batch deletion failed for some remaining tickets.");
+                                }
+                            }
+
+                            MessageToast.show("Successfully deleted " + iCount + " ticket(s).");
+                            await this._loadBackendData();
+                        } catch (e) {
+                            console.error("Error deleting all tickets", e);
+                            MessageToast.show("An error occurred while deleting tickets. Some tickets may not have been deleted.");
+                            // Refresh anyway to show the actual state
+                            await this._loadBackendData();
+                        }
+                    }
+                }
+            });
+        },
+
         onImportTicketsCSV: function () {
-            const sProjectId = this.getView().getModel().getProperty("/ticketsSelectedProjectId");
+            const oModel = this.getView().getModel();
+            const sProjectId = oModel.getProperty("/ticketsSelectedProjectId");
             if (!sProjectId) {
                 MessageToast.show("Please select a project to import tickets into first.");
                 return;
             }
 
-            this.byId("ticketsExcelFileUploader").clear();
-            // Programmatically trigger the hidden file uploader
-            var oUploader = this.byId("ticketsExcelFileUploader");
-            var oInput = oUploader ? oUploader.getFocusDomRef() : null;
-            if (oInput) {
-                oInput.click();
+            // Check if the selected project has a ticket template and show expected headers
+            const aProjects = oModel.getProperty("/projects") || [];
+            const oProject = aProjects.find(function (p) { return p.id === sProjectId; });
+            const aTicketTemplates = oModel.getProperty("/ticketTemplates") || [];
+            const oTemplate = oProject && oProject.ticketTemplateId
+                ? aTicketTemplates.find(function (t) { return t.id === oProject.ticketTemplateId; })
+                : null;
+
+            var that = this;
+            var fnOpenFilePicker = function () {
+                that.byId("ticketsExcelFileUploader").clear();
+                var oUploader = that.byId("ticketsExcelFileUploader");
+                var oInput = oUploader ? oUploader.getFocusDomRef() : null;
+                if (oInput) {
+                    oInput.click();
+                } else {
+                    var oTempInput = document.createElement("input");
+                    oTempInput.type = "file";
+                    oTempInput.accept = ".xlsx,.xls,.csv";
+                    oTempInput.style.display = "none";
+                    document.body.appendChild(oTempInput);
+                    oTempInput.onchange = function (e) {
+                        var file = e.target.files[0];
+                        if (file) that.onImportTicketsExcelFile({ getParameter: function () { return [file]; } });
+                        document.body.removeChild(oTempInput);
+                    };
+                    oTempInput.click();
+                }
+            };
+
+            if (oTemplate && oTemplate.items && oTemplate.items.length) {
+                // Show expected headers from the template before opening file picker
+                var aHeaders = oTemplate.items.map(function (it) { return it.module; });
+                var sHeaderList = aHeaders.map(function (h, i) { return (i + 1) + ". " + h; }).join("\n");
+                MessageBox.information(
+                    "This project has a ticket template assigned.\n\n" +
+                    "Your Excel file must have column headers that match the following template headers:\n\n" +
+                    sHeaderList + "\n\n" +
+                    "Only rows under matching header columns will be imported as tickets.",
+                    {
+                        title: "Expected Template Headers",
+                        onClose: function () {
+                            fnOpenFilePicker();
+                        }
+                    }
+                );
             } else {
-                // Fallback for hidden uploader
-                var oTempInput = document.createElement("input");
-                oTempInput.type = "file";
-                oTempInput.accept = ".xlsx,.xls,.csv";
-                oTempInput.style.display = "none";
-                document.body.appendChild(oTempInput);
-                var that = this;
-                oTempInput.onchange = function (e) {
-                    var file = e.target.files[0];
-                    if (file) that.onImportTicketsExcelFile({ getParameter: function () { return [file]; } });
-                    document.body.removeChild(oTempInput);
-                };
-                oTempInput.click();
+                // No template — open file picker directly (existing behavior)
+                fnOpenFilePicker();
             }
         },
 
@@ -4278,51 +4561,91 @@ sap.ui.define([
                 return;
             }
 
-            // If the project has a ticket template assigned, imported rows are validated
-            // against its module list; otherwise any module text is accepted (current behavior).
+            // If the project has a ticket template assigned, use template-header-based
+            // column matching; otherwise fall through to the legacy import path.
             const aTicketTemplates = oModel.getProperty("/ticketTemplates") || [];
             const oTemplate = oProject.ticketTemplateId
                 ? aTicketTemplates.find(t => t.id === oProject.ticketTemplateId)
                 : null;
 
+            if (oTemplate && oTemplate.items && oTemplate.items.length) {
+                // ---- Template-header-based import ----
+                await this._processImportedTicketsWithTemplate(dataArray, oProject, oTemplate, aResources, oODataModel);
+            } else {
+                // ---- Legacy import (no template) ----
+                await this._processImportedTicketsLegacy(dataArray, oProject, aResources, oODataModel);
+            }
+        },
+
+        /**
+         * Template-header-based import: matches Excel column headers against the
+         * project's ticket template headers. Each matched column + non-empty cell
+         * creates a ticket with that header as the module.
+         */
+        _processImportedTicketsWithTemplate: async function (dataArray, oProject, oTemplate, aResources, oODataModel) {
+            // Build a map of template header names (lowercased) → original template item
+            const aTemplateItems = oTemplate.items || [];
+            const mTemplateHeaderMap = {};
+            aTemplateItems.forEach(function (item) {
+                if (item.module) {
+                    mTemplateHeaderMap[item.module.toLowerCase().trim()] = item;
+                }
+            });
+
+            // Get the Excel column names from the first row
+            const aExcelColumns = dataArray.length > 0 ? Object.keys(dataArray[0]) : [];
+
+            // Find which Excel columns match template headers (case-insensitive)
+            const aMatchedColumns = []; // { excelCol: string, templateItem: object }
+            aExcelColumns.forEach(function (col) {
+                const sColLower = col.toLowerCase().trim();
+                if (mTemplateHeaderMap[sColLower]) {
+                    aMatchedColumns.push({
+                        excelCol: col,
+                        templateItem: mTemplateHeaderMap[sColLower]
+                    });
+                }
+            });
+
+            // If no columns matched, show error with expected headers
+            if (aMatchedColumns.length === 0) {
+                var aExpectedHeaders = aTemplateItems.map(function (it) { return it.module; });
+                MessageBox.error(
+                    "None of the Excel column headers match the project's template headers.\n\n" +
+                    "Expected headers:\n" +
+                    aExpectedHeaders.map(function (h, i) { return (i + 1) + ". " + h; }).join("\n") + "\n\n" +
+                    "Found in Excel:\n" +
+                    aExcelColumns.map(function (h, i) { return (i + 1) + ". " + h; }).join("\n") + "\n\n" +
+                    "Please update your Excel column headers to match the template headers and try again.",
+                    { title: "Header Mismatch" }
+                );
+                return;
+            }
+
+            // Bind list with explicit update group to prevent auto-submission
+            const oListBinding = oODataModel.bindList("/Tickets", null, [], [], { $$updateGroupId: BATCH_GROUP });
+
             let iCount = 0;
-            let iSkipped = 0;
-            let iSkippedModule = 0;
+            let iRowIndex = 0;
+            let bErrorOccurred = false;
 
-            for (const row of dataArray) {
-                // Try to find matching columns based on common names using the shared helper
-                const dateRaw = this._findColumnValue(row, ["Date", "Created At", "date", "Date Ref", "Date Logged", "Created", "Opened"]);
-                const module = this._findColumnValue(row, ["Module", "Area", "Category", "module", "Module Name", "Task type", "Assignment group"]);
-                const ticketNo = this._findColumnValue(row, ["Ticket No", "Ticket Ref", "Reference", "ID", "ticketNo", "Ticket #", "Number"]);
-                const desc = this._findColumnValue(row, ["Description", "Descrption", "Ticket Description", "Summary", "Details", "description", "Subject", "Desc", "Task Description", "Ticket Desc", "Short Description"]);
-                const resourceStr = this._findColumnValue(row, ["Resource", "Employee", "Assigned To", "Owner", "resource", "Assigned Resource", "Assign", "Assigned to"]);
-                const onBehalfStr = this._findColumnValue(row, ["On Behalf Of", "Requested By", "Client", "onBehalfOf", "Raised By", "Re-Assign"]);
-                const hoursRaw = this._findColumnValue(row, ["Hours", "Planned Hour", "Planned Hours", "Estimate", "Time", "hours"]);
-                const priorityRaw = this._findColumnValue(row, ["Priority"]);
-                const statusRaw = this._findColumnValue(row, ["Status", "State"]);
+            try {
+                for (const row of dataArray) {
+                    iRowIndex++;
+                    const dateRaw = this._findColumnValue(row, ["Date", "Created At", "date", "Date Ref", "Date Logged", "Created", "Opened"]);
+                    const ticketNo = this._findColumnValue(row, ["Ticket No", "Ticket Ref", "Reference", "ID", "ticketNo", "Ticket #", "Number"]);
+                    const resourceStr = this._findColumnValue(row, ["Resource", "Employee", "Assigned To", "Owner", "resource", "Assigned Resource", "Assign", "Assigned to"]);
+                    const onBehalfStr = this._findColumnValue(row, ["On Behalf Of", "Requested By", "Client", "onBehalfOf", "Raised By", "Re-Assign"]);
+                    const hoursRaw = this._findColumnValue(row, ["Hours", "Planned Hour", "Planned Hours", "Estimate", "Time", "hours"]);
+                    const priorityRaw = this._findColumnValue(row, ["Priority"]);
+                    const statusRaw = this._findColumnValue(row, ["Status", "State"]);
 
-                if (ticketNo || desc) {
-                    // Match the row's Module against the project's ticket template, if it has one
-                    let oTemplateItem = null;
-                    if (oTemplate) {
-                        oTemplateItem = (oTemplate.items || []).find(it =>
-                            it.module && module && it.module.toLowerCase().trim() === module.toLowerCase().trim()
-                        );
-                        if (!oTemplateItem) {
-                            iSkippedModule++;
-                            continue;
-                        }
-                    }
-
-                    const matchedRes = aResources.find(r =>
-                        r.name && resourceStr &&
-                        r.name.toLowerCase().trim() === resourceStr.toLowerCase().trim()
-                    );
-
-                    const matchedBehalf = aResources.find(r =>
-                        onBehalfStr && r.name &&
-                        r.name.toLowerCase().trim() === onBehalfStr.toLowerCase().trim()
-                    );
+                    const matchedRes = aResources.find(function (r) {
+                        return r.name && resourceStr && r.name.toLowerCase().trim() === resourceStr.toLowerCase().trim();
+                    });
+                    const matchedBehalf = aResources.find(function (r) {
+                        return onBehalfStr && r.name && r.name.toLowerCase().trim() === onBehalfStr.toLowerCase().trim();
+                    });
 
                     let ticketStatus = "Not Started";
                     if (statusRaw) {
@@ -4332,50 +4655,181 @@ sap.ui.define([
                         else if (s.includes("pend") || s.includes("hold") || s.includes("paus")) ticketStatus = "Paused";
                     }
 
-                    let ticketPriority = priorityRaw ? null : (oTemplateItem ? oTemplateItem.defaultPriority : null);
-                    if (priorityRaw) {
-                        const p = priorityRaw.toLowerCase();
-                        if (p.includes("high") || p.includes("critical") || p.includes("urgent")) ticketPriority = "High";
-                        else if (p.includes("low") || p.includes("minor")) ticketPriority = "Low";
-                        else ticketPriority = "Medium";
+                    // For each matched template header column, create a ticket if the cell has data
+                    for (const oMatch of aMatchedColumns) {
+                        const sCellValue = (row[oMatch.excelCol] || "").toString().trim();
+                        if (!sCellValue) continue; // skip empty cells
+
+                        const oTplItem = oMatch.templateItem;
+
+                        let ticketPriority = priorityRaw ? null : (oTplItem.defaultPriority || "Medium");
+                        if (priorityRaw) {
+                            const p = priorityRaw.toLowerCase();
+                            if (p.includes("high") || p.includes("critical") || p.includes("urgent")) ticketPriority = "High";
+                            else if (p.includes("low") || p.includes("minor")) ticketPriority = "Low";
+                            else ticketPriority = "Medium";
+                        }
+                        ticketPriority = ticketPriority || "Medium";
+
+                        const iHours = parseInt(hoursRaw, 10) || (oTplItem.defaultHours || 0);
+
+                        oListBinding.create({
+                            project_ID: oProject.id,
+                            date: this._formatDateForOData(dateRaw) || this._formatDateForOData(new Date()),
+                            module: oTplItem.module.substring(0, 50),
+                            ticketNo: (ticketNo || "TKT-" + iRowIndex).toString().substring(0, 50),
+                            description: sCellValue.substring(0, 500),
+                            resource_ID: matchedRes ? matchedRes.id : null,
+                            onBehalfOf_ID: matchedBehalf ? matchedBehalf.id : null,
+                            hours: iHours,
+                            priority: ticketPriority,
+                            status: ticketStatus
+                        });
+                        iCount++;
+
+                        // Chunk execution: Submit batch every 50 tickets to prevent payload/timeout errors
+                        if (iCount % 50 === 0) {
+                            await oODataModel.submitBatch(BATCH_GROUP);
+                            if (oODataModel.hasPendingChanges(BATCH_GROUP)) {
+                                oODataModel.resetChanges(BATCH_GROUP);
+                                throw new Error("Some tickets failed server validation.");
+                            }
+                        }
                     }
-                    ticketPriority = ticketPriority || "Medium";
-
-                    const iHours = parseInt(hoursRaw, 10) || (oTemplateItem ? (oTemplateItem.defaultHours || 0) : 0);
-
-                    this._createEntry(oODataModel, "/Tickets", {
-                        project_ID: oProject.id,
-                        date: this._formatDateForOData(dateRaw) || this._formatDateForOData(new Date()),
-                        module: (module || "Imported").toString().substring(0, 50),
-                        ticketNo: (ticketNo || "TKT-GEN").toString().substring(0, 50),
-                        description: desc ? desc.toString().substring(0, 500) : "",
-                        resource_ID: matchedRes ? matchedRes.id : null,
-                        onBehalfOf_ID: matchedBehalf ? matchedBehalf.id : null,
-                        hours: iHours,
-                        priority: ticketPriority,
-                        status: ticketStatus
-                    });
-                    iCount++;
-                } else {
-                    iSkipped++;
                 }
+
+                // Submit any remaining tickets
+                if (oODataModel.hasPendingChanges(BATCH_GROUP)) {
+                    await oODataModel.submitBatch(BATCH_GROUP);
+                    if (oODataModel.hasPendingChanges(BATCH_GROUP)) {
+                        oODataModel.resetChanges(BATCH_GROUP);
+                        throw new Error("Some remaining tickets failed server validation.");
+                    }
+                }
+            } catch (err) {
+                bErrorOccurred = true;
+                MessageToast.show("Error saving imported tickets. Imported only " + iCount + " ticket(s).");
+                console.error("Ticket import OData error", err);
             }
 
+            if (!bErrorOccurred && iCount > 0) {
+                var aMatchedNames = aMatchedColumns.map(function (m) { return m.templateItem.module; });
+                MessageToast.show("Successfully imported " + iCount + " ticket(s) into " + oProject.name + " (Matched headers: " + aMatchedNames.join(", ") + ").");
+            } else if (!bErrorOccurred && iCount === 0) {
+                MessageToast.show("No ticket data found under the matched header columns. Ensure cells are not empty.");
+            }
+
+            // Refresh data in both success and partial-success scenarios
             if (iCount > 0) {
-                try {
-                    // Using $auto group which is defined as a constant
-                    await oODataModel.submitBatch(BATCH_GROUP);
-                    let sMsg = "Imported " + iCount + " tickets into " + oProject.name + ".";
-                    if (iSkipped > 0) sMsg += " Skipped " + iSkipped + " invalid row(s).";
-                    if (iSkippedModule > 0) sMsg += " Skipped " + iSkippedModule + " row(s) with a module not in this project's ticket template.";
-                    MessageToast.show(sMsg);
-                    await this._loadBackendData();
-                } catch (err) {
-                    MessageToast.show("Failed to save imported tickets to database.");
-                    console.error("Ticket import OData error", err);
+                await this._loadBackendData();
+            }
+        },
+
+        /**
+         * Legacy import path — used when the project has no ticket template.
+         * Parses rows using the traditional column-name candidates (Module, Ticket No, etc.).
+         */
+        _processImportedTicketsLegacy: async function (dataArray, oProject, aResources, oODataModel) {
+            // Bind list with explicit update group to prevent auto-submission
+            const oListBinding = oODataModel.bindList("/Tickets", null, [], [], { $$updateGroupId: BATCH_GROUP });
+
+            let iCount = 0;
+            let iSkipped = 0;
+            let bErrorOccurred = false;
+
+            try {
+                for (const row of dataArray) {
+                    const dateRaw = this._findColumnValue(row, ["Date", "Created At", "date", "Date Ref", "Date Logged", "Created", "Opened"]);
+                    const module = this._findColumnValue(row, ["Module", "Area", "Category", "module", "Module Name", "Task type", "Assignment group"]);
+                    const ticketNo = this._findColumnValue(row, ["Ticket No", "Ticket Ref", "Reference", "ID", "ticketNo", "Ticket #", "Number"]);
+                    const desc = this._findColumnValue(row, ["Description", "Descrption", "Ticket Description", "Summary", "Details", "description", "Subject", "Desc", "Task Description", "Ticket Desc", "Short Description"]);
+                    const resourceStr = this._findColumnValue(row, ["Resource", "Employee", "Assigned To", "Owner", "resource", "Assigned Resource", "Assign", "Assigned to"]);
+                    const onBehalfStr = this._findColumnValue(row, ["On Behalf Of", "Requested By", "Client", "onBehalfOf", "Raised By", "Re-Assign"]);
+                    const hoursRaw = this._findColumnValue(row, ["Hours", "Planned Hour", "Planned Hours", "Estimate", "Time", "hours"]);
+                    const priorityRaw = this._findColumnValue(row, ["Priority"]);
+                    const statusRaw = this._findColumnValue(row, ["Status", "State"]);
+
+                    if (ticketNo || desc) {
+                        const matchedRes = aResources.find(r =>
+                            r.name && resourceStr &&
+                            r.name.toLowerCase().trim() === resourceStr.toLowerCase().trim()
+                        );
+
+                        const matchedBehalf = aResources.find(r =>
+                            onBehalfStr && r.name &&
+                            r.name.toLowerCase().trim() === onBehalfStr.toLowerCase().trim()
+                        );
+
+                        let ticketStatus = "Not Started";
+                        if (statusRaw) {
+                            const s = statusRaw.toLowerCase();
+                            if (s.includes("progress") || s.includes("active") || s.includes("working")) ticketStatus = "Working";
+                            else if (s.includes("clos") || s.includes("resolv") || s.includes("complet") || s.includes("done")) ticketStatus = "Completed";
+                            else if (s.includes("pend") || s.includes("hold") || s.includes("paus")) ticketStatus = "Paused";
+                        }
+
+                        let ticketPriority = "Medium";
+                        if (priorityRaw) {
+                            const p = priorityRaw.toLowerCase();
+                            if (p.includes("high") || p.includes("critical") || p.includes("urgent")) ticketPriority = "High";
+                            else if (p.includes("low") || p.includes("minor")) ticketPriority = "Low";
+                            else ticketPriority = "Medium";
+                        }
+
+                        const iHours = parseInt(hoursRaw, 10) || 0;
+
+                        oListBinding.create({
+                            project_ID: oProject.id,
+                            date: this._formatDateForOData(dateRaw) || this._formatDateForOData(new Date()),
+                            module: (module || "Imported").toString().substring(0, 50),
+                            ticketNo: (ticketNo || "TKT-GEN").toString().substring(0, 50),
+                            description: desc ? desc.toString().substring(0, 500) : "",
+                            resource_ID: matchedRes ? matchedRes.id : null,
+                            onBehalfOf_ID: matchedBehalf ? matchedBehalf.id : null,
+                            hours: iHours,
+                            priority: ticketPriority,
+                            status: ticketStatus
+                        });
+                        iCount++;
+
+                        // Chunk execution: Submit batch every 50 tickets to prevent payload/timeout errors
+                        if (iCount % 50 === 0) {
+                            await oODataModel.submitBatch(BATCH_GROUP);
+                            if (oODataModel.hasPendingChanges(BATCH_GROUP)) {
+                                oODataModel.resetChanges(BATCH_GROUP);
+                                throw new Error("Some tickets failed server validation.");
+                            }
+                        }
+                    } else {
+                        iSkipped++;
+                    }
                 }
-            } else {
-                MessageToast.show("No valid tickets found. Please check your column headers (Ticket No, Description, etc.)");
+
+                // Submit any remaining tickets
+                if (oODataModel.hasPendingChanges(BATCH_GROUP)) {
+                    await oODataModel.submitBatch(BATCH_GROUP);
+                    if (oODataModel.hasPendingChanges(BATCH_GROUP)) {
+                        oODataModel.resetChanges(BATCH_GROUP);
+                        throw new Error("Some remaining tickets failed server validation.");
+                    }
+                }
+            } catch (err) {
+                bErrorOccurred = true;
+                MessageToast.show("Error saving imported tickets. Imported only " + iCount + " ticket(s).");
+                console.error("Ticket import OData error", err);
+            }
+
+            if (!bErrorOccurred && iCount > 0) {
+                let sMsg = "Successfully imported " + iCount + " tickets into " + oProject.name + ".";
+                if (iSkipped > 0) sMsg += " Skipped " + iSkipped + " invalid row(s).";
+                MessageToast.show(sMsg);
+            } else if (!bErrorOccurred && iCount === 0) {
+                MessageToast.show("No valid ticket data found in the file.");
+            }
+
+            // Refresh data in both success and partial-success scenarios
+            if (iCount > 0) {
+                await this._loadBackendData();
             }
         },
 

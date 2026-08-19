@@ -814,8 +814,9 @@
                                     <core:Icon src="sap-icon://sys-monitor" size="1.5rem" color="#10b981" class="sapUiTinyMarginEnd" />
                                     <Title text="Tickets Allocation" class="sectionTitle" />
                                 </HBox>
-                                <HBox alignItems="Center">
+                                <HBox alignItems="Center" visible="{= !!${/ticketsSelectedProjectId} }">
                                     <u:FileUploader id="ticketsExcelFileUploader" visible="false" fileType="xlsx,xls,csv" change="onImportTicketsExcelFile" />
+                                    <Button text="Delete All Tickets" type="Reject" press="onDeleteAllTicketsForProject" class="sapUiSmallMarginEnd" visible="{= ${/ticketsForSelectedProject} !== undefined &amp;&amp; ${/ticketsForSelectedProject}.length > 0 }" />
                                     <Button text="Import" press="onImportTicketsCSV" class="customPrimaryBtn sapUiSmallMarginEnd" />
                                     <Button text="+ Add Ticket" press="onOpenAddTicketDialog" class="lightBlueBtn" />
                                 </HBox>
@@ -823,53 +824,69 @@
 
                             <!-- Project Filter -->
                             <VBox class="sapUiSmallMarginBottom" width="16rem">
-                                <Label text="Filter by Project" class="filterLabel" />
+                                <Label text="Select Project" class="filterLabel" />
                                 <Select selectedKey="{/ticketsSelectedProjectId}" items="{path: '/projects'}" forceSelection="false" change="onTicketsProjectFilterChange" width="100%" class="forceWhiteSelect">
+                                    <core:Item key="" text="-- Select a Project --" />
                                     <core:Item key="{id}" text="{name}" />
                                 </Select>
                             </VBox>
 
-                            <!-- Tickets Table -->
-                            <VBox class="customPanel" style="overflow-x: auto;" visible="{= ${/ticketsForSelectedProject}.length > 0}">
-                                <Table items="{/ticketsForSelectedProject}" class="customTable" mode="None">
-                                    <columns>
-                                        <Column width="7rem"><Text text="Date" class="colText"/></Column>
-                                        <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Project Name" class="colText"/></Column>
-                                        <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Module" class="colText"/></Column>
-                                        <Column><Text text="Ticket No / Ref" class="colText"/></Column>
-                                        <Column demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Description" class="colText"/></Column>
-                                        <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Priority" class="colText"/></Column>
-                                        <Column demandPopin="true" minScreenWidth="Tablet" popinDisplay="Inline"><Text text="Assign" class="colText"/></Column>
-                                        <Column demandPopin="true" minScreenWidth="Desktop" popinDisplay="Inline"><Text text="Re-Assign" class="colText"/></Column>
-                                        <Column width="5rem" hAlign="Center"><Text text="" class="colText"/></Column>
-                                    </columns>
-                                    <items>
-                                        <ColumnListItem vAlign="Middle" class="hoverableRow">
-                                            <cells>
-                                                <Text text="{path: 'date', formatter: '.formatDate'}" class="boldText" />
-                                                <Text text="{projectName}" class="boldText" />
-                                                <Text text="{module}" class="lightText" />
-                                                <Text text="{ticketNo}" class="boldText customBlueText" />
-                                                <Text text="{description}" class="lightText textXs" />
-                                                <ObjectStatus text="{priority}" state="{= ${priority} === 'High' ? 'Error' : (${priority} === 'Medium' ? 'Warning' : 'Success')}" class="customStatusPill" inverted="true" visible="{= !!${priority}}" />
-                                                <Text text="{resourceName}" class="lightText" />
-                                                <ComboBox selectedKey="{onBehalfOfId}" items="{path: '/resources', templateShareable: true}" change="onTicketOnBehalfOfChange" placeholder="Select..." width="10rem" class="customInput">
-                                                    <core:Item key="{id}" text="{name}" />
-                                                </ComboBox>
-                                                <HBox justifyContent="Center" width="100%">
-                                                    <Button icon="sap-icon://edit" type="Transparent" press="onEditTicket" tooltip="Edit Ticket" class="actionEdit sapUiTinyMarginEnd" />
-                                                    <Button icon="sap-icon://delete" type="Transparent" press="onDeleteTicket" tooltip="Delete Ticket" class="actionDelete" />
-                                                </HBox>
-                                            </cells>
-                                        </ColumnListItem>
-                                    </items>
-                                </Table>
+                            <!-- "Select a Project" Empty State (shown when no project is selected) -->
+                            <VBox visible="{= !${/ticketsSelectedProjectId} }" class="kpiCard" style="background-color: #f0f9ff; border: 2px dashed #93c5fd; padding: 2.5rem; align-items: center; justify-content: center; min-height: 220px; border-radius: 12px;">
+                                <core:Icon src="sap-icon://project-definition-triangle-2" size="3rem" color="#3b82f6" class="sapUiSmallMarginBottom" />
+                                <Text text="Select a Project" class="boldText" style="font-size: 1.1rem; color: #1e3a5f;" />
+                                <Text text="Please select a project from the dropdown above to view and manage tickets." class="lightText textXs sapUiTinyMarginTop" style="color: #64748b;" />
                             </VBox>
 
-                            <!-- Empty State -->
-                            <VBox visible="{= ${/ticketsForSelectedProject}.length === 0 }" class="kpiCard" style="background-color: #f9fafb; padding: 2rem; align-items: center; justify-content: center; min-height: 200px;">
+                            <!-- Dynamic Tickets Table (when project has a ticket template) -->
+                            <VBox visible="{= !!${/ticketsSelectedProjectId} &amp;&amp; ${/ticketsHasDynamicTemplate} }">
+                                <VBox id="dynamicTicketsTableContainer" class="ticketsTableScroll">
+                                </VBox>
+                            </VBox>
+
+                            <!-- Static Tickets Table (when project has NO ticket template) -->
+                            <VBox visible="{= !!${/ticketsSelectedProjectId} &amp;&amp; !${/ticketsHasDynamicTemplate} &amp;&amp; ${/ticketsForSelectedProject}.length > 0}">
+                                <VBox class="ticketsTableScroll">
+                                    <Table items="{/ticketsForSelectedProject}" class="customTable" mode="None" fixedLayout="false">
+                                        <columns>
+                                            <Column width="7rem"><Text text="Date" class="colText"/></Column>
+                                            <Column width="10rem"><Text text="Project Name" class="colText"/></Column>
+                                            <Column width="8rem"><Text text="Module" class="colText"/></Column>
+                                            <Column width="9rem"><Text text="Ticket No / Ref" class="colText"/></Column>
+                                            <Column width="14rem"><Text text="Description" class="colText"/></Column>
+                                            <Column width="6rem"><Text text="Priority" class="colText"/></Column>
+                                            <Column width="8rem"><Text text="Assign" class="colText"/></Column>
+                                            <Column width="11rem"><Text text="Re-Assign" class="colText"/></Column>
+                                            <Column width="6rem" hAlign="Center"><Text text="Actions" class="colText"/></Column>
+                                        </columns>
+                                        <items>
+                                            <ColumnListItem vAlign="Middle" class="hoverableRow">
+                                                <cells>
+                                                    <Text text="{path: 'date', formatter: '.formatDate'}" class="boldText" />
+                                                    <Text text="{projectName}" class="boldText" />
+                                                    <Text text="{module}" class="lightText" />
+                                                    <Text text="{ticketNo}" class="boldText customBlueText" />
+                                                    <Text text="{description}" class="lightText textXs" />
+                                                    <ObjectStatus text="{priority}" state="{= ${priority} === 'High' ? 'Error' : (${priority} === 'Medium' ? 'Warning' : 'Success')}" class="customStatusPill" inverted="true" visible="{= !!${priority}}" />
+                                                    <Text text="{resourceName}" class="lightText" />
+                                                    <ComboBox selectedKey="{onBehalfOfId}" items="{path: '/resources', templateShareable: true}" change="onTicketOnBehalfOfChange" placeholder="Select..." width="10rem" class="customInput">
+                                                        <core:Item key="{id}" text="{name}" />
+                                                    </ComboBox>
+                                                    <HBox justifyContent="Center" width="100%">
+                                                        <Button icon="sap-icon://edit" type="Transparent" press="onEditTicket" tooltip="Edit Ticket" class="actionEdit sapUiTinyMarginEnd" />
+                                                        <Button icon="sap-icon://delete" type="Transparent" press="onDeleteTicket" tooltip="Delete Ticket" class="actionDelete" />
+                                                    </HBox>
+                                                </cells>
+                                            </ColumnListItem>
+                                        </items>
+                                    </Table>
+                                </VBox>
+                            </VBox>
+
+                            <!-- Empty State (project selected but no tickets) -->
+                            <VBox visible="{= !!${/ticketsSelectedProjectId} &amp;&amp; !${/ticketsHasDynamicTemplate} &amp;&amp; ${/ticketsForSelectedProject}.length === 0 }" class="kpiCard" style="background-color: #f9fafb; padding: 2rem; align-items: center; justify-content: center; min-height: 200px;">
                                 <core:Icon src="sap-icon://sys-monitor" size="3rem" color="#d1d5db" class="sapUiSmallMarginBottom" />
-                                <Text text="{= !!${/ticketsSelectedProjectId} ? 'No tickets for this project yet.' : 'No tickets allocated yet.' }" class="boldText" />
+                                <Text text="No tickets for this project yet." class="boldText" />
                                 <Text text="Click '+ Add Ticket' or 'Import' to add tickets." class="lightText textXs sapUiTinyMarginTop" />
                             </VBox>
 

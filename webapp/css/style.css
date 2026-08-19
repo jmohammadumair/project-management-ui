@@ -618,6 +618,45 @@
 }
 
 /* =============================================
+   TICKETS TABLE: Horizontal Scroll Wrapper
+   ============================================= */
+
+.ticketsTableScroll {
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    width: 100% !important;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background-color: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+/* Slim custom scrollbar */
+.ticketsTableScroll::-webkit-scrollbar {
+    height: 8px;
+}
+
+.ticketsTableScroll::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 0 0 10px 10px;
+}
+
+.ticketsTableScroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #94a3b8, #64748b);
+    border-radius: 4px;
+}
+
+.ticketsTableScroll::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #64748b, #475569);
+}
+
+/* Ensure inner table doesn't shrink below its natural width */
+.ticketsTableScroll > .sapMList,
+.ticketsTableScroll .sapMListTbl {
+    min-width: 900px !important;
+}
+
+/* =============================================
    RESPONSIVE: Mobile & Tablet Adjustments
    ============================================= */
 
